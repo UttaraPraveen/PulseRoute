@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { saveData, loadData } from '../storage/storage';
+import { Swipeable } from 'react-native-gesture-handler';
 import {
   View,
   Text,
@@ -15,7 +16,7 @@ import {
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type DeliveryStatus = 'Pending' | 'In Transit' | 'Delivered' | 'Pending Sync';
+type DeliveryStatus = 'Pending' | 'In Transit' | 'Delivered' | 'Pending Sync' | 'Failed';
 type FilterOption = 'All' | 'Pending' | 'Transit';
 
 interface Delivery {
@@ -54,6 +55,7 @@ const colors = {
   transit:     { bg: '#E5F0FF', text: '#1A4FA3', pip: '#3B82F6' },
   delivered:   { bg: '#E3FAF0', text: '#0F6E56', pip: '#22C55E' },
   pendingSync: { bg: '#F3F0FF', text: '#5B21B6', pip: '#8B5CF6' },
+  failed:      { bg: '#FEF2F2', text: '#991B1B', pip: '#EF4444' },
 
   onlineBg:      '#E3FAF0',
   onlineBorder:  '#86EFAC',
@@ -123,6 +125,7 @@ function getStatusColors(status: DeliveryStatus) {
     case 'In Transit':   return colors.transit;
     case 'Delivered':    return colors.delivered;
     case 'Pending Sync': return colors.pendingSync;
+    case 'Failed':       return colors.failed;
   }
 }
 
@@ -132,42 +135,62 @@ function DeliveryCard({
   item,
   onPress,
   onMarkDelivered,
+  onMarkFailed,
 }: {
   item: Delivery;
   onPress: () => void;
   onMarkDelivered: () => void;
+  onMarkFailed: () => void;
 }) {
   const sc = getStatusColors(item.status);
   const canMark = item.status === 'Pending' || item.status === 'In Transit';
+  const swipeableRef = useRef<Swipeable>(null);
+
+  const renderLeftActions = () => (
+    <View style={styles.actionLeft}>
+      <Text style={styles.actionText}>✅ DELIVERED</Text>
+    </View>
+  );
+
+  const renderRightActions = () => (
+    <View style={styles.actionRight}>
+      <Text style={styles.actionText}>❌ FAILED</Text>
+    </View>
+  );
 
   return (
-    <TouchableOpacity onPress={onPress} activeOpacity={0.7} style={styles.card}>
-      <View style={[styles.statusPip, { backgroundColor: sc.pip }]} />
+    <Swipeable
+      ref={swipeableRef}
+      enabled={canMark}
+      renderLeftActions={renderLeftActions}
+      renderRightActions={renderRightActions}
+      onSwipeableOpen={(direction) => {
+        if (direction === 'left') {
+          onMarkDelivered();
+        } else if (direction === 'right') {
+          onMarkFailed();
+        }
+        swipeableRef.current?.close();
+      }}
+    >
+      <TouchableOpacity onPress={onPress} activeOpacity={1} style={styles.card}>
+        <View style={[styles.statusPip, { backgroundColor: sc.pip }]} />
 
-      <View style={styles.cardBody}>
-        <View style={styles.cardTop}>
-          <Text style={styles.orderId}>{item.id}</Text>
-          <View style={[styles.badge, { backgroundColor: sc.bg }]}>
-            <Text style={[styles.badgeText, { color: sc.text }]}>{item.status}</Text>
+        <View style={styles.cardBody}>
+          <View style={styles.cardTop}>
+            <Text style={styles.orderId}>{item.id}</Text>
+            <View style={[styles.badge, { backgroundColor: sc.bg }]}>
+              <Text style={[styles.badgeText, { color: sc.text }]}>{item.status}</Text>
+            </View>
           </View>
+
+          <Text style={styles.customerName}>{item.customer}</Text>
+          <Text style={styles.address} numberOfLines={1}>📍 {item.address}</Text>
         </View>
 
-        <Text style={styles.customerName}>{item.customer}</Text>
-        <Text style={styles.address} numberOfLines={1}>📍 {item.address}</Text>
-
-        {canMark && (
-          <TouchableOpacity
-            onPress={(e) => { e.stopPropagation?.(); onMarkDelivered(); }}
-            activeOpacity={0.8}
-            style={styles.markBtn}
-          >
-            <Text style={styles.markBtnText}>Mark as Delivered</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-
-      <Text style={styles.cardChevron}>›</Text>
-    </TouchableOpacity>
+        <Text style={styles.cardChevron}>›</Text>
+      </TouchableOpacity>
+    </Swipeable>
   );
 }
 
@@ -204,7 +227,7 @@ export default function DashboardScreen({ navigation }: any) {
         setSyncQueue(savedQueue);
       }
 
-      setIsStorageLoaded(true); // Flag that loading is complete
+      setIsStorageLoaded(true);
     };
 
     loadInitialData();
@@ -275,6 +298,19 @@ export default function DashboardScreen({ navigation }: any) {
     if (isOnline) {
       setDeliveries((prev) =>
         prev.map((d) => (d.id === id ? { ...d, status: 'Delivered' } : d))
+      );
+    } else {
+      setDeliveries((prev) =>
+        prev.map((d) => (d.id === id ? { ...d, status: 'Pending Sync' } : d))
+      );
+      setSyncQueue((prev) => [...prev, id]);
+    }
+  };
+
+  const markFailed = (id: string) => {
+    if (isOnline) {
+      setDeliveries((prev) =>
+        prev.map((d) => (d.id === id ? { ...d, status: 'Failed' } : d))
       );
     } else {
       setDeliveries((prev) =>
@@ -374,6 +410,7 @@ export default function DashboardScreen({ navigation }: any) {
             item={item}
             onPress={() => navigation.navigate('Detail', { delivery: item })}
             onMarkDelivered={() => markDelivered(item.id)}
+            onMarkFailed={() => markFailed(item.id)}
           />
         )}
         ListEmptyComponent={
@@ -478,9 +515,6 @@ const styles = StyleSheet.create({
   customerName: { fontSize: 14, color: colors.textPrimary, marginBottom: 2 },
   address:      { fontSize: 12, color: colors.textTertiary },
 
-  markBtn:     { marginTop: 10, paddingVertical: 7, paddingHorizontal: 14, borderRadius: 8, borderWidth: 0.5, borderColor: colors.delivered.pip, alignSelf: 'flex-start' },
-  markBtnText: { fontSize: 12, fontWeight: '500', color: colors.delivered.text },
-
   cardChevron: { fontSize: 22, color: colors.textTertiary, lineHeight: 24, marginTop: 2 },
 
   emptyState: { paddingTop: 40, alignItems: 'center' },
@@ -534,5 +568,25 @@ const styles = StyleSheet.create({
   telemetryRowLatest: {
     color: colors.textPrimary,
     fontWeight: '500',
+  },
+  
+  // Swipe Actions
+  actionLeft: {
+    backgroundColor: colors.delivered.pip,
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+    borderRadius: 14,
+  },
+  actionRight: {
+    backgroundColor: colors.failed.pip,
+    justifyContent: 'center',
+    alignItems: 'flex-end',
+    paddingHorizontal: 20,
+    borderRadius: 14,
+  },
+  actionText: {
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+    fontSize: 12,
   },
 });
