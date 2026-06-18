@@ -41,6 +41,22 @@ PulseRoute is designed for delivery couriers operating in environments with unre
 
 ---
 
+## Project Architecture
+
+DashboardScreen
+├── Delivery List
+├── Offline Queue
+├── Telemetry Generator
+└── Sync Engine
+
+DetailScreen
+├── Delivery Details
+├── Drop-off Instructions
+├── Map Placeholder
+└── Telemetry Feed
+
+---
+
 ## Screenshots
 
 ### Dashboard
