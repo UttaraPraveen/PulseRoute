@@ -56,6 +56,18 @@ function getStatusColors(status: DeliveryStatus) {
   }
 }
 
+// Helper to determine the dynamic Ombre background colors
+function getGradientColors(status: DeliveryStatus): readonly [string, string, string] {
+  switch (status) {
+    case 'Delivered':
+      return ['#FFFFFF', '#A7F3D0', colors.delivered.pip] as const;
+    case 'Failed':
+      return ['#FFFFFF', '#FECACA', colors.failed.pip] as const;
+    default:
+      return ['#FFFFFF', '#93C5FD', colors.primary] as const;
+  }
+}
+
 // ─── 3D Floating Graphic ──────────────────────────────────────────────────────
 
 const FloatingTruck = memo(function FloatingTruck() {
@@ -208,9 +220,9 @@ export default function DetailScreen({ route, navigation }: any) {
 
   return (
     <View style={styles.container}>
-      {/* Background Ombre Effect - White at top fading into Prominent Blue */}
+      {/* Dynamic Background Ombre Effect */}
       <LinearGradient
-        colors={['#FFFFFF', '#93C5FD', colors.primary]}
+        colors={getGradientColors(delivery.status)}
         style={StyleSheet.absoluteFill}
         start={{ x: 0, y: 0 }}
         end={{ x: 0, y: 0.4 }}
@@ -343,20 +355,8 @@ export default function DetailScreen({ route, navigation }: any) {
           </SectionCard>
         </ScrollView>
 
-        {/* ── Bottom action bar ── */}
-        {canAct ? (
-          <View style={styles.actionBar}>
-            <TouchableOpacity style={styles.callButton} accessibilityLabel="Call customer">
-              <Text style={styles.callButtonText}>📞</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.failButton}>
-              <Text style={styles.failButtonText}>Report Failed</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.deliveredButton}>
-              <Text style={styles.deliveredButtonText}>Mark Delivered</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
+        {/* ── Bottom status bar (Buttons Removed) ── */}
+        {!canAct && (
           <View style={[styles.actionBar, styles.statusBar]}>
             <View style={[styles.badgeDot, { backgroundColor: sc.pip }]} />
             <Text style={[styles.statusBarText, { color: sc.text }]}>
@@ -383,7 +383,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
     paddingHorizontal: 16,
-    paddingTop: Platform.OS === 'ios' ? 8 : 48, // Added padding for translucent status bar
+    paddingTop: Platform.OS === 'ios' ? 8 : 48,
     paddingBottom: 16,
     backgroundColor: 'transparent',
   },
@@ -393,7 +393,7 @@ const styles = StyleSheet.create({
     borderRadius: 9999, // Pure circle
     backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: colors.border, // Crisp border, no shadow
+    borderColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -406,7 +406,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   headerTitle: {
-    fontSize: 24, // Slightly reduced to fit comfortably on one line
+    fontSize: 24, 
     fontWeight: '800',
     color: colors.textPrimary,
     letterSpacing: -0.8,
@@ -420,7 +420,7 @@ const styles = StyleSheet.create({
     marginTop: -4,
   },
   graphicEmoji: {
-    fontSize: 28, // Scaled down slightly to match the new headerTitle size
+    fontSize: 28, 
     zIndex: 2,
     lineHeight: 36,
   },
@@ -440,7 +440,7 @@ const styles = StyleSheet.create({
     gap: 6, 
     paddingHorizontal: 12, 
     paddingVertical: 6, 
-    borderRadius: 9999, // Pill shape
+    borderRadius: 9999,
     borderWidth: 1,
   },
   badgeDot: { width: 6, height: 6, borderRadius: 3 },
@@ -451,7 +451,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: colors.border, // No shadows
+    borderColor: colors.border,
     padding: 20,
   },
   sectionLabel: { 
@@ -469,7 +469,7 @@ const styles = StyleSheet.create({
   heroAvatar: {
     width: 48,
     height: 48,
-    borderRadius: 9999, // Circle avatar
+    borderRadius: 9999,
     backgroundColor: colors.primaryLight,
     alignItems: 'center',
     justifyContent: 'center',
@@ -497,7 +497,7 @@ const styles = StyleSheet.create({
     height: 28,
     borderRadius: 14,
     backgroundColor: colors.bg,
-    borderWidth: 2, // Thicker, crisper border for the timeline
+    borderWidth: 2, 
     borderColor: colors.borderStrong,
     alignItems: 'center',
     justifyContent: 'center',
@@ -530,7 +530,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     backgroundColor: colors.primaryLight,
     borderWidth: 1,
-    borderColor: 'rgba(59, 130, 246, 0.2)', // Soft border for map area
+    borderColor: 'rgba(59, 130, 246, 0.2)',
     overflow: 'hidden',
     justifyContent: 'center',
   },
@@ -588,47 +588,16 @@ const styles = StyleSheet.create({
   statChipValue: { fontSize: 16, fontWeight: '800', color: colors.textPrimary, letterSpacing: -0.5 },
   statChipLabel: { fontSize: 10, color: colors.textTertiary, letterSpacing: 1.2, textTransform: 'uppercase', marginTop: 4, fontWeight: '800' },
 
-  // Bottom action bar
+  // Bottom action bar (Glassy transparent effect)
   actionBar: {
     flexDirection: 'row',
     gap: 12,
     paddingHorizontal: 16,
     paddingVertical: 16,
-    backgroundColor: colors.surface,
+    backgroundColor: 'rgba(255, 255, 255, 0.65)', 
     borderTopWidth: 1,
-    borderTopColor: colors.border,
+    borderTopColor: 'rgba(255, 255, 255, 0.4)', 
   },
-  callButton: {
-    width: 54,
-    height: 54,
-    borderRadius: 9999, // Pill shape
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.borderStrong,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  callButtonText: { fontSize: 20 },
-  failButton: {
-    flex: 1,
-    height: 54,
-    borderRadius: 9999, // Pill shape
-    borderWidth: 1.5,
-    borderColor: colors.failed.pip,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  failButtonText: { fontSize: 14, fontWeight: '800', color: colors.failed.pip },
-  deliveredButton: {
-    flex: 1.4,
-    height: 54,
-    borderRadius: 9999, // Pill shape
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  deliveredButtonText: { fontSize: 14, fontWeight: '800', color: '#FFFFFF' },
-
   statusBar: { alignItems: 'center', justifyContent: 'center', gap: 8 },
   statusBarText: { fontSize: 14, fontWeight: '700' },
 });
