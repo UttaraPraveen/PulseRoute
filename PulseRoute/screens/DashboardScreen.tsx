@@ -53,6 +53,11 @@ type TelemetryEvent = {
   };
 };
 
+type QueuedSync = {
+  id: string;
+  targetStatus: DeliveryStatus;
+};
+
 // ─── Design Tokens (Blue Theme - Arc / Linear Aesthetic) ──────────────────────
 
 const colors = {
@@ -528,7 +533,8 @@ export default function DashboardScreen({ navigation }: any) {
 
   const [isStorageLoaded, setIsStorageLoaded] = useState(false);
   const [deliveries, setDeliveries] = useState<Delivery[]>(DEFAULT_DELIVERIES);
-  const [syncQueue, setSyncQueue] = useState<string[]>([]);
+  // Type updated to handle both legacy strings and new object payloads
+  const [syncQueue, setSyncQueue] = useState<(QueuedSync | string)[]>([]);
 
   const syncSpinAnim = useRef(new Animated.Value(0)).current;
 
@@ -568,18 +574,39 @@ export default function DashboardScreen({ navigation }: any) {
     if (isStorageLoaded) saveData('syncQueue', syncQueue);
   }, [syncQueue, isStorageLoaded]);
 
+  // Synchronize Offline actions gracefully when reconnecting
   useEffect(() => {
     if (isOnline && syncQueue.length > 0) {
       setIsSyncing(true);
+      
       const timeout = setTimeout(() => {
         animateListChange();
+        
+        setDeliveries((prev) =>
+          prev.map((d) => {
+            // Find if this item exists in the queue (handling both legacy strings and objects)
+            const queuedItem = syncQueue.find((q) => 
+              typeof q === 'string' ? q === d.id : q.id === d.id
+            );
+            
+            if (queuedItem && d.status === 'Pending Sync') {
+              // Apply the targeted offline action or fallback to Delivered
+              const target = typeof queuedItem === 'string' ? 'Delivered' : queuedItem.targetStatus;
+              return { ...d, status: target };
+            }
+            return d;
+          })
+        );
+        
         setSyncQueue([]);
         setIsSyncing(false);
-        setDeliveries((prev) =>
-          prev.map((d) => (d.status === 'Pending Sync' ? { ...d, status: 'Delivered' } : d))
-        );
       }, 2000);
-      return () => clearTimeout(timeout);
+      
+      // Cleanup to resolve the memory leak / stuck state
+      return () => {
+        clearTimeout(timeout);
+        setIsSyncing(false); 
+      };
     }
   }, [isOnline, syncQueue]);
 
@@ -634,7 +661,7 @@ export default function DashboardScreen({ navigation }: any) {
       setDeliveries((prev) => prev.map((d) => (d.id === id ? { ...d, status: 'Delivered' } : d)));
     } else {
       setDeliveries((prev) => prev.map((d) => (d.id === id ? { ...d, status: 'Pending Sync' } : d)));
-      setSyncQueue((prev) => [...prev, id]);
+      setSyncQueue((prev) => [...prev, { id, targetStatus: 'Delivered' }]);
     }
   }, [isOnline]);
 
@@ -644,7 +671,7 @@ export default function DashboardScreen({ navigation }: any) {
       setDeliveries((prev) => prev.map((d) => (d.id === id ? { ...d, status: 'Failed' } : d)));
     } else {
       setDeliveries((prev) => prev.map((d) => (d.id === id ? { ...d, status: 'Pending Sync' } : d)));
-      setSyncQueue((prev) => [...prev, id]);
+      setSyncQueue((prev) => [...prev, { id, targetStatus: 'Failed' }]);
     }
   }, [isOnline]);
 
