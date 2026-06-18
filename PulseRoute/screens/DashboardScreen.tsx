@@ -1,5 +1,5 @@
-import React, { useState, useRef } from 'react';
-import { storage } from '../storage/mmkv';
+import React, { useState, useRef, useEffect } from 'react';
+import { saveData, loadData } from '../storage/storage';
 import {
   View,
   Text,
@@ -70,7 +70,7 @@ function OnlineToggle({ value, onToggle }: { value: boolean; onToggle: () => voi
     pulseAnim.setValue(1);
   };
 
-  React.useEffect(() => {
+  useEffect(() => {
     Animated.spring(anim, {
       toValue: value ? 1 : 0,
       useNativeDriver: false,
@@ -159,63 +159,59 @@ function DeliveryCard({
 
 // ─── Dashboard Screen ─────────────────────────────────────────────────────────
 
+const DEFAULT_DELIVERIES: Delivery[] = [
+  { id: 'PR-1001', customer: 'Alice Johnson', address: 'MG Road, Bangalore', status: 'Pending' },
+  { id: 'PR-1002', customer: 'Bob Smith', address: 'Indiranagar, Bangalore', status: 'In Transit' },
+  { id: 'PR-1003', customer: 'Charlie Brown', address: 'Koramangala, Bangalore', status: 'Pending' },
+  { id: 'PR-1004', customer: 'Diana Patel', address: 'Whitefield, Bangalore', status: 'In Transit' },
+];
+
 export default function DashboardScreen({ navigation }: any) {
-  const [isOnline, setIsOnline]       = useState(false);
-  const storedDeliveries = storage.getString('deliveries');
-
-const [deliveries, setDeliveries] = useState<Delivery[]>(
-  storedDeliveries
-    ? JSON.parse(storedDeliveries)
-    : [
-        {
-          id: 'PR-1001',
-          customer: 'Alice Johnson',
-          address: 'MG Road, Bangalore',
-          status: 'Pending',
-        },
-        {
-          id: 'PR-1002',
-          customer: 'Bob Smith',
-          address: 'Indiranagar, Bangalore',
-          status: 'In Transit',
-        },
-        {
-          id: 'PR-1003',
-          customer: 'Charlie Brown',
-          address: 'Koramangala, Bangalore',
-          status: 'Pending',
-        },
-        {
-          id: 'PR-1004',
-          customer: 'Diana Patel',
-          address: 'Whitefield, Bangalore',
-          status: 'In Transit',
-        },
-      ]
-);
-storage.set('test', 'hello');
-
-console.log(storage.getString('test'));
-  const storedQueue = storage.getString('syncQueue');
-
-const [syncQueue, setSyncQueue] = useState<string[]>(
-  storedQueue ? JSON.parse(storedQueue) : []
-);
-  const [filter, setFilter]               = useState<FilterOption>('All');
+  const [isOnline, setIsOnline] = useState(false);
+  const [filter, setFilter] = useState<FilterOption>('All');
   const [telemetryLogs, setTelemetryLogs] = useState<string[]>([]);
-  const [isSyncing, setIsSyncing]         = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
 
-  //AutoSave syncQueue to MMKV whenever it changes
+  // Storage State
+  const [isStorageLoaded, setIsStorageLoaded] = useState(false);
+  const [deliveries, setDeliveries] = useState<Delivery[]>(DEFAULT_DELIVERIES);
+  const [syncQueue, setSyncQueue] = useState<string[]>([]);
 
-  React.useEffect(() => {
-  storage.set(
-    'syncQueue',
-    JSON.stringify(syncQueue)
-  );
-}, [syncQueue]);
+  // ── Initialize AsyncStorage Data ──────────────────────────────────────────
+  useEffect(() => {
+    const loadInitialData = async () => {
+      const savedDeliveries = await loadData('deliveries');
+      if (savedDeliveries) {
+        setDeliveries(savedDeliveries);
+      }
+
+      const savedQueue = await loadData('syncQueue');
+      if (savedQueue) {
+        setSyncQueue(savedQueue);
+      }
+
+      setIsStorageLoaded(true); // Flag that loading is complete
+    };
+
+    loadInitialData();
+  }, []);
+
+  // ── Auto-save deliveries to AsyncStorage ────────────────────────────────
+  useEffect(() => {
+    if (isStorageLoaded) {
+      saveData('deliveries', deliveries);
+    }
+  }, [deliveries, isStorageLoaded]);
+
+  // ── Auto-save syncQueue to AsyncStorage ─────────────────────────────────
+  useEffect(() => {
+    if (isStorageLoaded) {
+      saveData('syncQueue', syncQueue);
+    }
+  }, [syncQueue, isStorageLoaded]);
 
   // ── Auto-sync when coming back online ────────────────────────────────────
-  React.useEffect(() => {
+  useEffect(() => {
     if (isOnline && syncQueue.length > 0) {
       setIsSyncing(true);
 
@@ -234,16 +230,8 @@ const [syncQueue, setSyncQueue] = useState<string[]>(
     }
   }, [isOnline, syncQueue]);
 
-//AutoSave deliveries to MMKV whenever they change
-  React.useEffect(() => {
-  storage.set(
-    'deliveries',
-    JSON.stringify(deliveries)
-  );
-}, [deliveries]);
-
   // ── Telemetry simulator ───────────────────────────────────────────────────
-  React.useEffect(() => {
+  useEffect(() => {
     const interval = setInterval(() => {
       const speed    = Math.floor(Math.random() * 80);
       const battery  = Math.floor(60 + Math.random() * 40);
