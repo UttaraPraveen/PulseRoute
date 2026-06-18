@@ -49,11 +49,11 @@ PulseRoute is designed for delivery couriers operating in environments with unre
 
 ### Offline Queue
 
-![Offline Queue](screenshots/offline-queue.png)
+![Offline Queue](screenshots/offline-mode.jpeg)
 
 ### Delivery Detail View
 
-![Delivery Detail](screenshots/detail-screen.png)
+![Delivery Detail](screenshots/detailscreen.jpeg)
 
 ---
 
