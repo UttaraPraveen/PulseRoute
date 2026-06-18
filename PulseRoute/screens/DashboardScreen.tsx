@@ -120,7 +120,7 @@ const FloatingPackage = memo(function FloatingPackage() {
     Animated.loop(
       Animated.sequence([
         Animated.timing(floatAnim, {
-          toValue: -8, // Slightly smaller float range to match tighter sizing
+          toValue: -8, 
           duration: 1800,
           easing: Easing.inOut(Easing.sin),
           useNativeDriver: true,
@@ -315,13 +315,23 @@ const DeliveryCard = memo(function DeliveryCard({
   onMarkDelivered: (id: string) => void;
   onMarkFailed: (id: string) => void;
 }) {
-  const sc = getStatusColors(item.status);
-  const canMark = item.status === 'Pending' || item.status === 'In Transit';
   const swipeableRef = useRef<Swipeable>(null);
   const isTransit = item.status === 'In Transit';
+  const isDelivered = item.status === 'Delivered';
+  const isFailed = item.status === 'Failed';
+  const isPendingSync = item.status === 'Pending Sync';
+  const canMark = item.status === 'Pending' || item.status === 'In Transit';
 
-  // 1. Entrance Anim
+  // 1. Core Animated Values
   const entranceAnim = useRef(new Animated.Value(0)).current;
+  const pressScale = useRef(new Animated.Value(1)).current;
+  const pressY = useRef(new Animated.Value(0)).current;
+  const pressHighlight = useRef(new Animated.Value(0)).current;
+
+  // Animation values for action feedbacks (Pop & Shake)
+  const actionScale = useRef(new Animated.Value(1)).current;
+  const actionTranslateX = useRef(new Animated.Value(0)).current;
+
   useEffect(() => {
     const delay = index * 70;
     Animated.spring(entranceAnim, {
@@ -333,97 +343,53 @@ const DeliveryCard = memo(function DeliveryCard({
     }).start();
   }, [entranceAnim, index]);
 
-  // 2. Complex Press Mechanics
-  const pressScale = useRef(new Animated.Value(1)).current;
-  const pressY = useRef(new Animated.Value(0)).current;
-  const pressHighlight = useRef(new Animated.Value(0)).current;
-
   const onPressIn = useCallback(() => {
     Animated.parallel([
-      Animated.spring(pressScale, {
-        toValue: 0.96,
-        useNativeDriver: true,
-        speed: 50,
-        bounciness: 0,
-      }),
-      Animated.spring(pressY, {
-        toValue: 3,
-        useNativeDriver: true,
-        speed: 50,
-        bounciness: 0,
-      }),
-      Animated.timing(pressHighlight, {
-        toValue: 1,
-        duration: 100,
-        useNativeDriver: true,
-      }),
+      Animated.spring(pressScale, { toValue: 0.96, useNativeDriver: true, speed: 50, bounciness: 0 }),
+      Animated.spring(pressY, { toValue: 3, useNativeDriver: true, speed: 50, bounciness: 0 }),
+      Animated.timing(pressHighlight, { toValue: 1, duration: 100, useNativeDriver: true }),
     ]).start();
   }, [pressScale, pressY, pressHighlight]);
 
   const onPressOut = useCallback(() => {
     Animated.parallel([
-      Animated.spring(pressScale, {
-        toValue: 1,
-        useNativeDriver: true,
-        speed: 35,
-        bounciness: 8, 
-      }),
-      Animated.spring(pressY, {
-        toValue: 0,
-        useNativeDriver: true,
-        speed: 35,
-        bounciness: 8,
-      }),
-      Animated.timing(pressHighlight, {
-        toValue: 0,
-        duration: 300,
-        useNativeDriver: true,
-      }),
+      Animated.spring(pressScale, { toValue: 1, useNativeDriver: true, speed: 35, bounciness: 8 }),
+      Animated.spring(pressY, { toValue: 0, useNativeDriver: true, speed: 35, bounciness: 8 }),
+      Animated.timing(pressHighlight, { toValue: 0, duration: 300, useNativeDriver: true }),
     ]).start();
   }, [pressScale, pressY, pressHighlight]);
 
-  // 3. Physical Closure Micro-Interaction
-  const exitOpacity = useRef(new Animated.Value(1)).current;
-  const exitScale = useRef(new Animated.Value(1)).current;
-
-  const triggerExitSequence = useCallback((callback: () => void) => {
+  // "Pop" Animation for successful deliveries (swiping left)
+  const triggerDeliveredAnim = useCallback((callback: () => void) => {
+    swipeableRef.current?.close();
     Animated.sequence([
-      Animated.parallel([
-        Animated.timing(exitOpacity, {
-          toValue: 0,
-          duration: 150,
-          useNativeDriver: true,
-        }),
-        Animated.spring(exitScale, {
-          toValue: 0.5,
-          tension: 100,
-          friction: 12,
-          useNativeDriver: true,
-        }),
-      ])
-    ]).start(() => {
-      callback();
-    });
-  }, [exitOpacity, exitScale]);
+      Animated.spring(actionScale, { toValue: 1.05, speed: 40, bounciness: 12, useNativeDriver: true }), // Quick celebratory pop
+      Animated.spring(actionScale, { toValue: 1, speed: 40, bounciness: 8, useNativeDriver: true }),
+    ]).start();
+    // Delay state update slightly so the pop plays out seamlessly
+    setTimeout(callback, 150);
+  }, [actionScale]);
 
-  // 4. Organic Breathing State for Active Cards
+  // "Shake" Animation for failed deliveries (swiping right)
+  const triggerFailedAnim = useCallback((callback: () => void) => {
+    swipeableRef.current?.close();
+    Animated.sequence([
+      Animated.timing(actionTranslateX, { toValue: 12, duration: 50, useNativeDriver: true }),
+      Animated.timing(actionTranslateX, { toValue: -12, duration: 50, useNativeDriver: true }),
+      Animated.timing(actionTranslateX, { toValue: 8, duration: 50, useNativeDriver: true }),
+      Animated.timing(actionTranslateX, { toValue: -8, duration: 50, useNativeDriver: true }),
+      Animated.timing(actionTranslateX, { toValue: 0, duration: 50, useNativeDriver: true }),
+    ]).start();
+    setTimeout(callback, 200);
+  }, [actionTranslateX]);
+
   const breatheAnim = useRef(new Animated.Value(1)).current;
   useEffect(() => {
     if (isTransit) {
       Animated.loop(
         Animated.sequence([
-          Animated.timing(breatheAnim, {
-            toValue: 1.015,
-            duration: 2000,
-            easing: Easing.inOut(Easing.sin),
-            useNativeDriver: true,
-          }),
-          Animated.timing(breatheAnim, {
-            toValue: 1,
-            duration: 2000,
-            easing: Easing.inOut(Easing.sin),
-            useNativeDriver: true,
-          }),
+          Animated.timing(breatheAnim, { toValue: 1.015, duration: 2000, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+          Animated.timing(breatheAnim, { toValue: 1, duration: 2000, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
         ])
       ).start();
     }
@@ -446,7 +412,7 @@ const DeliveryCard = memo(function DeliveryCard({
   return (
     <Animated.View
       style={{
-        opacity: Animated.multiply(entranceAnim, exitOpacity),
+        opacity: entranceAnim,
         transform: [
           {
             translateY: entranceAnim.interpolate({
@@ -454,7 +420,8 @@ const DeliveryCard = memo(function DeliveryCard({
               outputRange: [40, 0],
             }),
           },
-          { scale: exitScale }
+          { translateX: actionTranslateX },
+          { scale: actionScale }
         ],
       }}
     >
@@ -467,9 +434,9 @@ const DeliveryCard = memo(function DeliveryCard({
         overshootFriction={8}
         onSwipeableOpen={(direction) => {
           if (direction === 'left') {
-            triggerExitSequence(() => onMarkDelivered(item.id));
+            triggerDeliveredAnim(() => onMarkDelivered(item.id));
           } else if (direction === 'right') {
-            triggerExitSequence(() => onMarkFailed(item.id));
+            triggerFailedAnim(() => onMarkFailed(item.id));
           }
         }}
       >
@@ -482,6 +449,9 @@ const DeliveryCard = memo(function DeliveryCard({
             style={[
               styles.card,
               isTransit && styles.cardActive,
+              isDelivered && styles.cardDelivered,
+              isFailed && styles.cardFailed,
+              isPendingSync && styles.cardPendingSync,
               { 
                 transform: [
                   { scale: isTransit ? Animated.multiply(pressScale, breatheAnim) : pressScale },
@@ -905,6 +875,18 @@ const styles = StyleSheet.create({
   cardActive: {
     backgroundColor: colors.primaryLight,
     borderColor: colors.borderActive, 
+  },
+  cardDelivered: {
+    backgroundColor: colors.delivered.bg,
+    borderColor: colors.delivered.border,
+  },
+  cardFailed: {
+    backgroundColor: colors.failed.bg,
+    borderColor: colors.failed.border,
+  },
+  cardPendingSync: {
+    backgroundColor: colors.pendingSync.bg,
+    borderColor: colors.pendingSync.border,
   },
   pressOverlay: {
     backgroundColor: 'rgba(59, 130, 246, 0.08)',
