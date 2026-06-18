@@ -14,7 +14,6 @@ export default function App() {
           name="Dashboard"
           component={DashboardScreen}
         />
-
         <Stack.Screen
           name="Detail"
           component={DetailScreen}

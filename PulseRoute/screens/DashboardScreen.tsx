@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
   FlatList,
   TouchableOpacity,
+  Switch,
 } from 'react-native';
 
 const deliveries = [
@@ -28,34 +29,34 @@ const deliveries = [
 ];
 
 export default function DashboardScreen({ navigation }: any) {
+  const [isOnline, setIsOnline] = useState(true); // ✅ moved inside component
+
   return (
-    <View
-      style={{
-        flex: 1,
-        padding: 16,
-        paddingTop: 50,
-      }}
-    >
-      <Text
+    <View style={{ flex: 1, padding: 16, paddingTop: 50 }}>
+      <Text style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 20 }}>
+        PulseRoute 🚚
+      </Text>
+
+      <View
         style={{
-          fontSize: 24,
-          fontWeight: 'bold',
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          alignItems: 'center',
           marginBottom: 20,
         }}
       >
-        PulseRoute 🚚
-      </Text>
+        <Text style={{ fontSize: 16, fontWeight: 'bold' }}>
+          {isOnline ? '🟢 Online' : '🔴 Offline'}
+        </Text>
+        <Switch value={isOnline} onValueChange={setIsOnline} />
+      </View>
 
       <FlatList
         data={deliveries}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
           <TouchableOpacity
-            onPress={() =>
-              navigation.navigate('Detail', {
-                delivery: item,
-              })
-            }
+            onPress={() => navigation.navigate('Detail', { delivery: item })}
           >
             <View
               style={{
@@ -66,21 +67,10 @@ export default function DashboardScreen({ navigation }: any) {
                 marginBottom: 12,
               }}
             >
-              <Text style={{ fontWeight: 'bold' }}>
-                {item.id}
-              </Text>
-
+              <Text style={{ fontWeight: 'bold' }}>{item.id}</Text>
               <Text>{item.customer}</Text>
-
               <Text>{item.address}</Text>
-
-              <Text
-                style={{
-                  marginTop: 8,
-                }}
-              >
-                Status: {item.status}
-              </Text>
+              <Text style={{ marginTop: 8 }}>Status: {item.status}</Text>
             </View>
           </TouchableOpacity>
         )}
