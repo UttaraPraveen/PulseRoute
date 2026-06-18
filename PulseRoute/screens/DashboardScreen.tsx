@@ -25,6 +25,20 @@ interface Delivery {
   status: DeliveryStatus;
 }
 
+type TelemetryEvent = {
+  tracking_id: string;
+  timestamp: number;
+  telemetry: {
+    latitude: number;
+    longitude: number;
+    speed_kmh: number;
+  };
+  device_metrics: {
+    battery_level: number;
+    network_latency_ms: number;
+  };
+};
+
 // ─── Design tokens ────────────────────────────────────────────────────────────
 
 const colors = {
@@ -160,16 +174,16 @@ function DeliveryCard({
 // ─── Dashboard Screen ─────────────────────────────────────────────────────────
 
 const DEFAULT_DELIVERIES: Delivery[] = [
-  { id: 'PR-1001', customer: 'Alice Johnson', address: 'MG Road, Bangalore', status: 'Pending' },
-  { id: 'PR-1002', customer: 'Bob Smith', address: 'Indiranagar, Bangalore', status: 'In Transit' },
-  { id: 'PR-1003', customer: 'Charlie Brown', address: 'Koramangala, Bangalore', status: 'Pending' },
-  { id: 'PR-1004', customer: 'Diana Patel', address: 'Whitefield, Bangalore', status: 'In Transit' },
+  { id: 'PR-1001', customer: 'Alice Johnson', address: 'Pattom, Trivandrum', status: 'Pending' },
+  { id: 'PR-1002', customer: 'Bob Smith', address: 'Kowdiar, Trivandrum', status: 'In Transit' },
+  { id: 'PR-1003', customer: 'Charlie Brown', address: 'Kazhakkoottam, Trivandrum', status: 'Pending' },
+  { id: 'PR-1004', customer: 'Diana Patel', address: 'Vazhuthacaud, Trivandrum', status: 'In Transit' },
 ];
 
 export default function DashboardScreen({ navigation }: any) {
   const [isOnline, setIsOnline] = useState(false);
   const [filter, setFilter] = useState<FilterOption>('All');
-  const [telemetryLogs, setTelemetryLogs] = useState<string[]>([]);
+  const [telemetryLogs, setTelemetryLogs] = useState<TelemetryEvent[]>([]);
   const [isSyncing, setIsSyncing] = useState(false);
 
   // Storage State
@@ -233,13 +247,22 @@ export default function DashboardScreen({ navigation }: any) {
   // ── Telemetry simulator ───────────────────────────────────────────────────
   useEffect(() => {
     const interval = setInterval(() => {
-      const speed    = Math.floor(Math.random() * 80);
-      const battery  = Math.floor(60 + Math.random() * 40);
-      const gpsLabel = ['Strong', 'Good', 'Weak'][Math.floor(Math.random() * 3)];
-      const now      = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      const event: TelemetryEvent = {
+        tracking_id: 'PR-1004',
+        timestamp: Date.now(),
+        telemetry: {
+          latitude: 8.5241 + Math.random() * 0.01,
+          longitude: 76.9366 + Math.random() * 0.01,
+          speed_kmh: Math.floor(Math.random() * 80),
+        },
+        device_metrics: {
+          battery_level: Math.floor(60 + Math.random() * 40),
+          network_latency_ms: Math.floor(20 + Math.random() * 100),
+        },
+      };
 
       setTelemetryLogs((prev) => [
-        `${now}  🚗 ${speed} km/h  🔋 ${battery}%  📡 GPS ${gpsLabel}`,
+        event,
         ...prev.slice(0, 9),
       ]);
     }, 500);
@@ -370,12 +393,17 @@ export default function DashboardScreen({ navigation }: any) {
                 <Text style={styles.telemetryRow}>Waiting for signal…</Text>
               ) : (
                 telemetryLogs.map((log, i) => (
-                  <Text
-                    key={i}
-                    style={[styles.telemetryRow, i === 0 && styles.telemetryRowLatest]}
-                  >
-                    {log}
-                  </Text>
+                  <View key={log.timestamp + '-' + i} style={styles.logBlock}>
+                    <Text style={[styles.telemetryRow, i === 0 && styles.telemetryRowLatest]}>
+                      {log.tracking_id}
+                    </Text>
+                    <Text style={[styles.telemetryRow, i === 0 && styles.telemetryRowLatest]}>
+                      📍 {log.telemetry.latitude.toFixed(4)}, {log.telemetry.longitude.toFixed(4)}
+                    </Text>
+                    <Text style={[styles.telemetryRow, i === 0 && styles.telemetryRowLatest]}>
+                      🚗 {log.telemetry.speed_kmh} km/h   🔋 {log.device_metrics.battery_level}%   📶 {log.device_metrics.network_latency_ms} ms
+                    </Text>
+                  </View>
                 ))
               )}
             </ScrollView>
@@ -490,13 +518,18 @@ const styles = StyleSheet.create({
     color: colors.textTertiary,
     letterSpacing: 0.8,
   },
-  telemetryScroll: { maxHeight: 180 },
+  telemetryScroll: { maxHeight: 220 },
+  logBlock: {
+    paddingVertical: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
   telemetryRow: {
     fontSize: 11,
     color: colors.textTertiary,
     fontFamily: 'Courier',
     paddingHorizontal: 14,
-    paddingVertical: 4,
+    paddingVertical: 2,
   },
   telemetryRowLatest: {
     color: colors.textPrimary,
