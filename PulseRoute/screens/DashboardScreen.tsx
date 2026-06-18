@@ -325,13 +325,10 @@ const DeliveryCard = memo(function DeliveryCard({
   const isPendingSync = item.status === 'Pending Sync';
   const canMark = item.status === 'Pending' || item.status === 'In Transit';
 
-  // 1. Core Animated Values
   const entranceAnim = useRef(new Animated.Value(0)).current;
   const pressScale = useRef(new Animated.Value(1)).current;
   const pressY = useRef(new Animated.Value(0)).current;
   const pressHighlight = useRef(new Animated.Value(0)).current;
-
-  // Animation values for action feedbacks (Pop & Shake)
   const actionScale = useRef(new Animated.Value(1)).current;
   const actionTranslateX = useRef(new Animated.Value(0)).current;
 
@@ -362,7 +359,6 @@ const DeliveryCard = memo(function DeliveryCard({
     ]).start();
   }, [pressScale, pressY, pressHighlight]);
 
-  // "Pop" Animation for successful deliveries (swiping left)
   const triggerDeliveredAnim = useCallback((callback: () => void) => {
     swipeableRef.current?.close();
     Animated.sequence([
@@ -372,7 +368,6 @@ const DeliveryCard = memo(function DeliveryCard({
     setTimeout(callback, 150);
   }, [actionScale]);
 
-  // "Shake" Animation for failed deliveries (swiping right)
   const triggerFailedAnim = useCallback((callback: () => void) => {
     swipeableRef.current?.close();
     Animated.sequence([
@@ -531,8 +526,13 @@ export default function DashboardScreen({ navigation }: any) {
 
   const [isStorageLoaded, setIsStorageLoaded] = useState(false);
   const [deliveries, setDeliveries] = useState<Delivery[]>(DEFAULT_DELIVERIES);
-  
   const [syncQueue, setSyncQueue] = useState<QueuedSync[]>([]);
+
+  // 1. DYNAMIC REFERENCE FIX: Overcomes FlatList stale closure behavior
+  const isOnlineRef = useRef<boolean | null>(isOnline);
+  useEffect(() => {
+    isOnlineRef.current = isOnline;
+  }, [isOnline]);
 
   const syncSpinAnim = useRef(new Animated.Value(0)).current;
   const bgAnim = useRef(new Animated.Value(1)).current;
@@ -558,7 +558,12 @@ export default function DashboardScreen({ navigation }: any) {
       if (savedDeliveries) setDeliveries(savedDeliveries);
       
       const savedQueue = await loadData('syncQueue');
-      if (savedQueue) setSyncQueue(savedQueue);
+      // 2. DEFENSIVE PARSING: Ensures valid arrays so syncQueue.length doesn't break
+      if (Array.isArray(savedQueue)) {
+        setSyncQueue(savedQueue);
+      } else {
+        setSyncQueue([]);
+      }
       
       const savedIsOnline = await loadData('isOnline');
       if (savedIsOnline !== null && savedIsOnline !== undefined) {
@@ -572,7 +577,6 @@ export default function DashboardScreen({ navigation }: any) {
     loadInitialData();
   }, []);
 
-  // SAVE DATA HOOKS
   useEffect(() => {
     if (isStorageLoaded) saveData('deliveries', deliveries);
   }, [deliveries, isStorageLoaded]);
@@ -662,23 +666,23 @@ export default function DashboardScreen({ navigation }: any) {
 
   const handleMarkDelivered = useCallback((id: string) => {
     animateListChange();
-    if (isOnline) {
+    if (isOnlineRef.current) {
       setDeliveries((prev) => prev.map((d) => (d.id === id ? { ...d, status: 'Delivered' } : d)));
     } else {
       setDeliveries((prev) => prev.map((d) => (d.id === id ? { ...d, status: 'Pending Sync' } : d)));
       setSyncQueue((prev) => [...prev, { id, targetStatus: 'Delivered' }]);
     }
-  }, [isOnline]);
+  }, []);
 
   const handleMarkFailed = useCallback((id: string) => {
     animateListChange();
-    if (isOnline) {
+    if (isOnlineRef.current) {
       setDeliveries((prev) => prev.map((d) => (d.id === id ? { ...d, status: 'Failed' } : d)));
     } else {
       setDeliveries((prev) => prev.map((d) => (d.id === id ? { ...d, status: 'Pending Sync' } : d)));
       setSyncQueue((prev) => [...prev, { id, targetStatus: 'Failed' }]);
     }
-  }, [isOnline]);
+  }, []);
 
   const renderItem = useCallback(({ item, index }: { item: Delivery; index: number }) => (
     <DeliveryCard
@@ -726,7 +730,6 @@ export default function DashboardScreen({ navigation }: any) {
 
         <View style={styles.header}>
 
-          {/* Hero Stack with inline Package */}
           <View style={styles.headerHero}>
             <Text style={styles.wordmarkSub}>DRIVER CONSOLE</Text>
             <View style={styles.titleRow}>
@@ -735,7 +738,6 @@ export default function DashboardScreen({ navigation }: any) {
             </View>
           </View>
 
-          {/* Filter Pills and Online Toggle Row */}
           <View style={styles.filterToggleRow}>
             <View style={styles.pillRow}>
               {(['All', 'Pending', 'Transit'] as FilterOption[]).map((f) => (
@@ -751,7 +753,6 @@ export default function DashboardScreen({ navigation }: any) {
             <OnlineToggle value={isOnline} onToggle={() => setIsOnline((v) => !v)} />
           </View>
 
-          {/* Sync Banners - Moved Below Filters into a stable container */}
           <View style={styles.bannerContainer}>
             {isSyncing && (
               <View style={[styles.syncBanner, styles.syncBannerSyncing]}>
@@ -767,7 +768,8 @@ export default function DashboardScreen({ navigation }: any) {
                 </Text>
               </View>
             )}
-            {!isOnline && syncQueue.length > 0 && !isSyncing && (
+            {/* 4. EXPLICIT BANNER FIX: using strictly boolean checks */}
+            {isOnline === false && syncQueue.length > 0 && !isSyncing && (
               <View style={styles.syncBanner}>
                 <Feather name="cloud-off" size={14} color={colors.pending.text} />
                 <Text style={styles.syncBannerText}>
@@ -779,8 +781,10 @@ export default function DashboardScreen({ navigation }: any) {
 
         </View>
 
+        {/* 3. EXTRADATA FIX: Ensures list UI watches the exact dependencies */}
         <FlatList
           data={filteredDeliveries}
+          extraData={{ isOnline, queueLength: syncQueue.length }}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
@@ -906,7 +910,7 @@ const styles = StyleSheet.create({
   toggleThumb: { width: 20, height: 20, borderRadius: 9999, backgroundColor: colors.surface, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 3, elevation: 3 },
 
   bannerContainer: {
-    minHeight: 0, // Keeps structural stability for LayoutAnimation
+    minHeight: 0, 
   },
   syncBanner: { 
     flexDirection: 'row', 
