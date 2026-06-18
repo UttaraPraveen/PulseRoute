@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import { storage } from '../storage/mmkv';
 import {
   View,
   Text,
@@ -160,16 +161,58 @@ function DeliveryCard({
 
 export default function DashboardScreen({ navigation }: any) {
   const [isOnline, setIsOnline]       = useState(false);
-  const [deliveries, setDeliveries]   = useState<Delivery[]>([
-    { id: 'PR-1001', customer: 'Alice Johnson', address: 'MG Road, Bangalore',       status: 'Pending'    },
-    { id: 'PR-1002', customer: 'Bob Smith',      address: 'Indiranagar, Bangalore',  status: 'In Transit' },
-    { id: 'PR-1003', customer: 'Charlie Brown',  address: 'Koramangala, Bangalore',  status: 'Pending'    },
-    { id: 'PR-1004', customer: 'Diana Patel',    address: 'Whitefield, Bangalore',   status: 'In Transit' },
-  ]);
-  const [syncQueue, setSyncQueue]         = useState<string[]>([]);
+  const storedDeliveries = storage.getString('deliveries');
+
+const [deliveries, setDeliveries] = useState<Delivery[]>(
+  storedDeliveries
+    ? JSON.parse(storedDeliveries)
+    : [
+        {
+          id: 'PR-1001',
+          customer: 'Alice Johnson',
+          address: 'MG Road, Bangalore',
+          status: 'Pending',
+        },
+        {
+          id: 'PR-1002',
+          customer: 'Bob Smith',
+          address: 'Indiranagar, Bangalore',
+          status: 'In Transit',
+        },
+        {
+          id: 'PR-1003',
+          customer: 'Charlie Brown',
+          address: 'Koramangala, Bangalore',
+          status: 'Pending',
+        },
+        {
+          id: 'PR-1004',
+          customer: 'Diana Patel',
+          address: 'Whitefield, Bangalore',
+          status: 'In Transit',
+        },
+      ]
+);
+storage.set('test', 'hello');
+
+console.log(storage.getString('test'));
+  const storedQueue = storage.getString('syncQueue');
+
+const [syncQueue, setSyncQueue] = useState<string[]>(
+  storedQueue ? JSON.parse(storedQueue) : []
+);
   const [filter, setFilter]               = useState<FilterOption>('All');
   const [telemetryLogs, setTelemetryLogs] = useState<string[]>([]);
   const [isSyncing, setIsSyncing]         = useState(false);
+
+  //AutoSave syncQueue to MMKV whenever it changes
+
+  React.useEffect(() => {
+  storage.set(
+    'syncQueue',
+    JSON.stringify(syncQueue)
+  );
+}, [syncQueue]);
 
   // ── Auto-sync when coming back online ────────────────────────────────────
   React.useEffect(() => {
@@ -190,6 +233,14 @@ export default function DashboardScreen({ navigation }: any) {
       return () => clearTimeout(timeout);
     }
   }, [isOnline, syncQueue]);
+
+//AutoSave deliveries to MMKV whenever they change
+  React.useEffect(() => {
+  storage.set(
+    'deliveries',
+    JSON.stringify(deliveries)
+  );
+}, [deliveries]);
 
   // ── Telemetry simulator ───────────────────────────────────────────────────
   React.useEffect(() => {
