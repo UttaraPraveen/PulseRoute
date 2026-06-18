@@ -366,7 +366,6 @@ const DeliveryCard = memo(function DeliveryCard({
       Animated.spring(actionScale, { toValue: 1.05, speed: 40, bounciness: 12, useNativeDriver: true }), // Quick celebratory pop
       Animated.spring(actionScale, { toValue: 1, speed: 40, bounciness: 8, useNativeDriver: true }),
     ]).start();
-    // Delay state update slightly so the pop plays out seamlessly
     setTimeout(callback, 150);
   }, [actionScale]);
 
@@ -533,9 +532,22 @@ export default function DashboardScreen({ navigation }: any) {
 
   const syncSpinAnim = useRef(new Animated.Value(0)).current;
 
+  // Background Transition Animation Value
+  const bgAnim = useRef(new Animated.Value(1)).current;
+
   const animateListChange = () => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
   };
+
+  // Crossfade background smoothly when toggling isOnline
+  useEffect(() => {
+    Animated.timing(bgAnim, {
+      toValue: isOnline ? 1 : 0,
+      duration: 600, // Very smooth crossfade duration
+      easing: Easing.inOut(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [isOnline, bgAnim]);
 
   useEffect(() => {
     const loadInitialData = async () => {
@@ -655,13 +667,23 @@ export default function DashboardScreen({ navigation }: any) {
 
   return (
     <View style={styles.container}>
-      {/* Background Ombre Effect */}
+      {/* Base Offline Gradient Layer (Cool Slate/Gray) */}
       <LinearGradient
-        colors={['#BFDBFE', '#EFF6FF', colors.bg]}
+        colors={['#D1D5DB', '#F3F4F6', colors.bg]}
         style={StyleSheet.absoluteFill}
         start={{ x: 0, y: 0 }}
         end={{ x: 0, y: 0.5 }}
       />
+      
+      {/* Animated Overlay Online Gradient Layer (Blue) */}
+      <Animated.View style={[StyleSheet.absoluteFill, { opacity: bgAnim }]}>
+        <LinearGradient
+          colors={['#BFDBFE', '#EFF6FF', colors.bg]}
+          style={StyleSheet.absoluteFill}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 0, y: 0.5 }}
+        />
+      </Animated.View>
       
       <SafeAreaView style={styles.safeArea}>
         <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent={true} />
