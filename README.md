@@ -43,17 +43,23 @@ PulseRoute is designed for delivery couriers operating in environments with unre
 
 ## Screenshots
 
-### Dashboard
+## Screenshots
 
-![Dashboard](screenshots/dashboard.png)
+<p align="center">
+  <img src="PulseRoute/screenshots/dashboard.png" width="250"/>
+  <img src="PulseRoute/screenshots/offline-mode.png" width="250"/>
+</p>
 
-### Offline Queue
+<p align="center">
+  <em>Dashboard View</em> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+  <em>Offline Queue & Pending Sync</em>
+</p>
 
-![Offline Queue](screenshots/offline-mode.jpeg)
+<h3>Delivery Detail</h3>
 
-### Delivery Detail View
-
-![Delivery Detail](screenshots/detailscreen.jpeg)
+<p align="center">
+  <img src="PulseRoute/screenshots/detailscreen.jpeg" width="300"/>
+</p>
 
 ---
 
@@ -113,6 +119,7 @@ npm run ios
 
 ## Project Architecture
 
+```text
 DashboardScreen
 ├── Delivery List
 ├── Offline Queue
@@ -124,6 +131,7 @@ DetailScreen
 ├── Drop-off Instructions
 ├── Map Placeholder
 └── Telemetry Feed
+```
 
 ---
 
@@ -131,13 +139,11 @@ DetailScreen
 
 ## 1. Offline-First Architecture
 
-The primary requirement of this assessment was maintaining functionality during connectivity loss.
+PulseRoute is designed to remain fully functional even in environments with unreliable or unavailable network connectivity. Delivery personnel frequently operate in areas where internet access may be intermittent, making an uninterrupted workflow essential.
 
-To achieve this, all delivery updates are applied locally before any synchronization attempt occurs. When the application is offline, actions are stored in a local synchronization queue and marked as "Pending Sync".
+To support this, all delivery actions are recorded locally before any synchronization is attempted. When the application is offline, updates are stored in a local synchronization queue and marked as Pending Sync.
 
-Once connectivity is restored, queued operations are processed automatically and statuses are updated accordingly.
-
-This approach ensures reliability and prevents data loss during network interruptions.
+Once connectivity is restored, queued actions are processed automatically and synchronized in sequence. This approach ensures data consistency, preserves user actions, and provides a reliable experience regardless of network conditions.
 
 ---
 
