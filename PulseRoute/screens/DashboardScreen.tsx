@@ -1,7 +1,7 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useLayoutEffect, memo } from 'react';
 import { saveData, loadData } from '../storage/storage';
 import { Swipeable } from 'react-native-gesture-handler';
-import { Feather, Ionicons } from '@expo/vector-icons';
+import { Feather } from '@expo/vector-icons';
 import {
   View,
   Text,
@@ -16,12 +16,15 @@ import {
   LayoutAnimation,
   Platform,
   UIManager,
+  Easing,
 } from 'react-native';
 
 // Enable LayoutAnimation on Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
+
+const AnimatedFeather = Animated.createAnimatedComponent(Feather);
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -49,28 +52,28 @@ type TelemetryEvent = {
   };
 };
 
-// ─── Design Tokens (Updated to match reference image) ─────────────────────────
+// ─── Design Tokens (Blue Theme - Arc / Linear Aesthetic) ──────────────────────
 
 const colors = {
-  bg: '#F8F9FB', // Soft off-white background
+  bg: '#F8F9FB',
   surface: '#FFFFFF',
-  border: '#F3F4F6',
+  border: '#E5E7EB',
+  borderActive: 'rgba(59, 130, 246, 0.25)',
   textPrimary: '#111827',
   textSecondary: '#6B7280',
   textTertiary: '#9CA3AF',
 
-  // Primary brand colors from image
-  primary: '#8B5CF6',
-  primaryLight: '#F5F3FF',
+  primary: '#3B82F6',
+  primaryLight: '#EFF6FF',
 
-  pending:     { bg: '#FFFBEB', text: '#D97706', pip: '#F59E0B' },
-  transit:     { bg: '#F5F3FF', text: '#8B5CF6', pip: '#8B5CF6' }, // Light purple for active
-  delivered:   { bg: '#ECFDF5', text: '#059669', pip: '#10B981' },
-  pendingSync: { bg: '#F3F4F6', text: '#4B5563', pip: '#6B7280' },
-  failed:      { bg: '#FEF2F2', text: '#DC2626', pip: '#EF4444' },
+  pending:     { bg: '#FFFBEB', text: '#D97706', pip: '#F59E0B', border: 'rgba(245, 158, 11, 0.2)' },
+  transit:     { bg: '#EFF6FF', text: '#3B82F6', pip: '#3B82F6', border: 'rgba(59, 130, 246, 0.2)' },
+  delivered:   { bg: '#ECFDF5', text: '#059669', pip: '#10B981', border: 'rgba(16, 185, 129, 0.2)' },
+  pendingSync: { bg: '#F3F4F6', text: '#4B5563', pip: '#6B7280', border: 'rgba(107, 114, 128, 0.2)' },
+  failed:      { bg: '#FEF2F2', text: '#DC2626', pip: '#EF4444', border: 'rgba(239, 68, 68, 0.2)' },
 
-  onlineBg:      '#8B5CF6', // Purple toggle
-  onlineBorder:  '#8B5CF6',
+  onlineBg:      '#3B82F6',
+  onlineBorder:  '#3B82F6',
   onlineDot:     '#FFFFFF',
   offlineBg:     '#E5E7EB',
   offlineBorder: '#E5E7EB',
@@ -78,7 +81,7 @@ const colors = {
 
 // ─── Animated Toggle ──────────────────────────────────────────────────────────
 
-function OnlineToggle({ value, onToggle }: { value: boolean; onToggle: () => void }) {
+const OnlineToggle = memo(function OnlineToggle({ value, onToggle }: { value: boolean; onToggle: () => void }) {
   const anim = useRef(new Animated.Value(value ? 1 : 0)).current;
 
   useEffect(() => {
@@ -88,7 +91,7 @@ function OnlineToggle({ value, onToggle }: { value: boolean; onToggle: () => voi
       bounciness: 10,
       speed: 14,
     }).start();
-  }, [value]);
+  }, [value, anim]);
 
   const thumbTranslate   = anim.interpolate({ inputRange: [0, 1], outputRange: [4, 28] });
   const trackBg          = anim.interpolate({ inputRange: [0, 1], outputRange: [colors.offlineBg, colors.onlineBg] });
@@ -105,7 +108,64 @@ function OnlineToggle({ value, onToggle }: { value: boolean; onToggle: () => voi
       </Pressable>
     </View>
   );
-}
+});
+
+// ─── 3D Floating Package Graphic ──────────────────────────────────────────────
+
+const FloatingPackage = memo(function FloatingPackage() {
+  const floatAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(floatAnim, {
+          toValue: -8, // Slightly smaller float range to match tighter sizing
+          duration: 1800,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(floatAnim, {
+          toValue: 0, 
+          duration: 1800,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  }, [floatAnim]);
+
+  const shadowScale = floatAnim.interpolate({
+    inputRange: [-8, 0],
+    outputRange: [0.6, 1],
+  });
+
+  const shadowOpacity = floatAnim.interpolate({
+    inputRange: [-8, 0],
+    outputRange: [0.2, 0.5],
+  });
+
+  return (
+    <View style={styles.floatingContainer}>
+      <Animated.Text 
+        style={[
+          styles.packageEmoji, 
+          { transform: [{ translateY: floatAnim }] }
+        ]}
+      >
+        📦
+      </Animated.Text>
+      <Animated.View
+        style={[
+          styles.packageShadow,
+          {
+            transform: [{ scale: shadowScale }],
+            opacity: shadowOpacity,
+          },
+        ]}
+      />
+    </View>
+  );
+});
 
 // ─── Status Helpers ───────────────────────────────────────────────────────────
 
@@ -119,22 +179,254 @@ function getStatusColors(status: DeliveryStatus) {
   }
 }
 
-// ─── Delivery Card (Redesigned) ───────────────────────────────────────────────
+// ─── Shimmer Component ────────────────────────────────────────────────────────
 
-function DeliveryCard({
+const ShimmerBar = memo(function ShimmerBar() {
+  const shimmerAnim = useRef(new Animated.Value(-1)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.timing(shimmerAnim, {
+        toValue: 2,
+        duration: 2200,
+        easing: Easing.inOut(Easing.quad),
+        useNativeDriver: true,
+      })
+    ).start();
+  }, [shimmerAnim]);
+
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={[
+        StyleSheet.absoluteFill,
+        styles.shimmerOverlay,
+        {
+          transform: [
+            {
+              translateX: shimmerAnim.interpolate({
+                inputRange: [-1, 2],
+                outputRange: [-300, 700],
+              }),
+            },
+          ],
+        },
+      ]}
+    />
+  );
+});
+
+// ─── Pulsing Badge ────────────────────────────────────────────────────────────
+
+const PulsingBadge = memo(function PulsingBadge({ status }: { status: DeliveryStatus }) {
+  const sc = getStatusColors(status);
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const isTransit = status === 'In Transit';
+
+  useEffect(() => {
+    if (!isTransit) return;
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1.07,
+          duration: 900,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 900,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  }, [isTransit, pulseAnim]);
+
+  return (
+    <Animated.View
+      style={[
+        styles.badge,
+        { backgroundColor: sc.bg, borderColor: sc.border, transform: [{ scale: pulseAnim }] },
+      ]}
+    >
+      <Text style={[styles.badgeText, { color: sc.text }]}>{status}</Text>
+    </Animated.View>
+  );
+});
+
+// ─── Bouncing Pin Icon ─────────────────────────────────────────────────────────
+
+const BouncingPin = memo(function BouncingPin({ status }: { status: DeliveryStatus }) {
+  const sc = getStatusColors(status);
+  const bounceAnim = useRef(new Animated.Value(0)).current;
+  const isTransit = status === 'In Transit';
+
+  useEffect(() => {
+    if (!isTransit) return;
+    const delay = Math.floor(Math.random() * 600);
+    const timeout = setTimeout(() => {
+      Animated.loop(
+        Animated.sequence([
+          Animated.spring(bounceAnim, {
+            toValue: -6,
+            useNativeDriver: true,
+            speed: 20,
+            bounciness: 12,
+          }),
+          Animated.spring(bounceAnim, {
+            toValue: 0,
+            useNativeDriver: true,
+            speed: 12,
+            bounciness: 8,
+          }),
+          Animated.delay(1800),
+        ])
+      ).start();
+    }, delay);
+    return () => clearTimeout(timeout);
+  }, [isTransit, bounceAnim]);
+
+  return (
+    <Animated.View
+      style={[
+        styles.addressIconWrapper,
+        { backgroundColor: sc.bg, borderWidth: 1, borderColor: sc.border, transform: [{ translateY: bounceAnim }] },
+      ]}
+    >
+      <Feather name="map-pin" size={16} color={sc.pip} />
+    </Animated.View>
+  );
+});
+
+// ─── Delivery Card (Ultra-Smooth Interactive Redesign) ────────────────────────
+
+const DeliveryCard = memo(function DeliveryCard({
   item,
+  index,
   onPress,
   onMarkDelivered,
   onMarkFailed,
 }: {
   item: Delivery;
-  onPress: () => void;
-  onMarkDelivered: () => void;
-  onMarkFailed: () => void;
+  index: number;
+  onPress: (item: Delivery) => void;
+  onMarkDelivered: (id: string) => void;
+  onMarkFailed: (id: string) => void;
 }) {
   const sc = getStatusColors(item.status);
   const canMark = item.status === 'Pending' || item.status === 'In Transit';
   const swipeableRef = useRef<Swipeable>(null);
+  const isTransit = item.status === 'In Transit';
+
+  // 1. Entrance Anim
+  const entranceAnim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const delay = index * 70;
+    Animated.spring(entranceAnim, {
+      toValue: 1,
+      delay,
+      useNativeDriver: true,
+      tension: 40,
+      friction: 7,
+    }).start();
+  }, [entranceAnim, index]);
+
+  // 2. Complex Press Mechanics
+  const pressScale = useRef(new Animated.Value(1)).current;
+  const pressY = useRef(new Animated.Value(0)).current;
+  const pressHighlight = useRef(new Animated.Value(0)).current;
+
+  const onPressIn = useCallback(() => {
+    Animated.parallel([
+      Animated.spring(pressScale, {
+        toValue: 0.96,
+        useNativeDriver: true,
+        speed: 50,
+        bounciness: 0,
+      }),
+      Animated.spring(pressY, {
+        toValue: 3,
+        useNativeDriver: true,
+        speed: 50,
+        bounciness: 0,
+      }),
+      Animated.timing(pressHighlight, {
+        toValue: 1,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [pressScale, pressY, pressHighlight]);
+
+  const onPressOut = useCallback(() => {
+    Animated.parallel([
+      Animated.spring(pressScale, {
+        toValue: 1,
+        useNativeDriver: true,
+        speed: 35,
+        bounciness: 8, 
+      }),
+      Animated.spring(pressY, {
+        toValue: 0,
+        useNativeDriver: true,
+        speed: 35,
+        bounciness: 8,
+      }),
+      Animated.timing(pressHighlight, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [pressScale, pressY, pressHighlight]);
+
+  // 3. Physical Closure Micro-Interaction
+  const exitOpacity = useRef(new Animated.Value(1)).current;
+  const exitScale = useRef(new Animated.Value(1)).current;
+
+  const triggerExitSequence = useCallback((callback: () => void) => {
+    Animated.sequence([
+      Animated.parallel([
+        Animated.timing(exitOpacity, {
+          toValue: 0,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+        Animated.spring(exitScale, {
+          toValue: 0.5,
+          tension: 100,
+          friction: 12,
+          useNativeDriver: true,
+        }),
+      ])
+    ]).start(() => {
+      callback();
+    });
+  }, [exitOpacity, exitScale]);
+
+  // 4. Organic Breathing State for Active Cards
+  const breatheAnim = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    if (isTransit) {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(breatheAnim, {
+            toValue: 1.015,
+            duration: 2000,
+            easing: Easing.inOut(Easing.sin),
+            useNativeDriver: true,
+          }),
+          Animated.timing(breatheAnim, {
+            toValue: 1,
+            duration: 2000,
+            easing: Easing.inOut(Easing.sin),
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
+    }
+  }, [isTransit, breatheAnim]);
 
   const renderLeftActions = () => (
     <View style={styles.actionLeft}>
@@ -151,54 +443,92 @@ function DeliveryCard({
   );
 
   return (
-    <Swipeable
-      ref={swipeableRef}
-      enabled={canMark}
-      renderLeftActions={renderLeftActions}
-      renderRightActions={renderRightActions}
-      friction={2}
-      overshootFriction={8}
-      onSwipeableOpen={(direction) => {
-        if (direction === 'left') onMarkDelivered();
-        else if (direction === 'right') onMarkFailed();
-        swipeableRef.current?.close();
+    <Animated.View
+      style={{
+        opacity: Animated.multiply(entranceAnim, exitOpacity),
+        transform: [
+          {
+            translateY: entranceAnim.interpolate({
+              inputRange: [0, 1],
+              outputRange: [40, 0],
+            }),
+          },
+          { scale: exitScale }
+        ],
       }}
     >
-      <TouchableOpacity 
-        onPress={onPress} 
-        activeOpacity={0.8} 
-        style={[styles.card, item.status === 'In Transit' && styles.cardActive]}
+      <Swipeable
+        ref={swipeableRef}
+        enabled={canMark}
+        renderLeftActions={renderLeftActions}
+        renderRightActions={renderRightActions}
+        friction={2}
+        overshootFriction={8}
+        onSwipeableOpen={(direction) => {
+          if (direction === 'left') {
+            triggerExitSequence(() => onMarkDelivered(item.id));
+          } else if (direction === 'right') {
+            triggerExitSequence(() => onMarkFailed(item.id));
+          }
+        }}
       >
-        {/* Card Header */}
-        <View style={styles.cardHeader}>
-          <View style={styles.cardIconBox}>
-            <Feather name="package" size={20} color={sc.pip} />
-          </View>
-          <View style={{ flex: 1, marginLeft: 12 }}>
-            <Text style={styles.customerName}>{item.customer}</Text>
-            <Text style={styles.orderId}>ID: {item.id}</Text>
-          </View>
-          <View style={[styles.badge, { backgroundColor: sc.bg }]}>
-            <Text style={[styles.badgeText, { color: sc.text }]}>{item.status}</Text>
-          </View>
-        </View>
+        <Pressable
+          onPressIn={onPressIn}
+          onPressOut={onPressOut}
+          onPress={() => onPress(item)}
+        >
+          <Animated.View
+            style={[
+              styles.card,
+              isTransit && styles.cardActive,
+              { 
+                transform: [
+                  { scale: isTransit ? Animated.multiply(pressScale, breatheAnim) : pressScale },
+                  { translateY: pressY }
+                ] 
+              },
+            ]}
+          >
+            {isTransit && (
+              <View style={[StyleSheet.absoluteFill, { borderRadius: 20, overflow: 'hidden' }]} pointerEvents="none">
+                <ShimmerBar />
+              </View>
+            )}
 
-        {/* Routing Indicator mimicking the reference image */}
-        <View style={styles.routingContainer}>
-          <View style={styles.routePoint}>
-            <View style={styles.routeDotOrigin} />
-            <Text style={styles.routeText} numberOfLines={1}>Warehouse</Text>
-          </View>
-          <View style={styles.routeLine} />
-          <View style={styles.routePoint}>
-            <View style={[styles.routeDotDest, { backgroundColor: sc.pip }]} />
-            <Text style={[styles.routeText, { color: colors.textPrimary }]} numberOfLines={1}>{item.address}</Text>
-          </View>
-        </View>
-      </TouchableOpacity>
-    </Swipeable>
+            <Animated.View 
+              style={[
+                StyleSheet.absoluteFill, 
+                styles.pressOverlay, 
+                { opacity: pressHighlight }
+              ]} 
+              pointerEvents="none" 
+            />
+
+            <View style={styles.cardHeader}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.customerName}>{item.customer}</Text>
+                <Text style={styles.orderId}>Order ID: {item.id}</Text>
+              </View>
+              <PulsingBadge status={item.status} />
+            </View>
+
+            <View style={styles.cardDivider} />
+
+            <View style={styles.addressSection}>
+              <BouncingPin status={item.status} />
+              <View style={styles.addressTextWrapper}>
+                <Text style={styles.addressLabel}>DELIVER TO</Text>
+                <Text style={styles.addressValue} numberOfLines={2}>{item.address}</Text>
+              </View>
+            </View>
+          </Animated.View>
+        </Pressable>
+      </Swipeable>
+    </Animated.View>
   );
-}
+}, (prevProps, nextProps) =>
+  prevProps.item === nextProps.item && prevProps.index === nextProps.index
+);
 
 // ─── Dashboard Screen ─────────────────────────────────────────────────────────
 
@@ -207,9 +537,20 @@ const DEFAULT_DELIVERIES: Delivery[] = [
   { id: 'L814315788', customer: 'Bob Smith', address: 'Kowdiar, Trivandrum', status: 'In Transit' },
   { id: 'M914315742', customer: 'Charlie Brown', address: 'Kazhakkoottam, Trivandrum', status: 'Pending' },
   { id: 'K214315711', customer: 'Diana Patel', address: 'Vazhuthacaud, Trivandrum', status: 'In Transit' },
+  { id: 'P514315802', customer: 'Ethan Hunt', address: 'Technopark Phase 3, Trivandrum', status: 'In Transit' },
+  { id: 'T714315999', customer: 'Fiona Gallagher', address: 'Palayam, Trivandrum', status: 'Pending' },
+  { id: 'W314316001', customer: 'George Costanza', address: 'Varkala Cliff, Trivandrum', status: 'In Transit' },
+  { id: 'R814316112', customer: 'Hannah Abbott', address: 'Neyyattinkara, Trivandrum', status: 'Pending' },
+  { id: 'S414316201', customer: 'Isaac Newton', address: 'Sasthamangalam, Trivandrum', status: 'In Transit' },
+  { id: 'J914316345', customer: 'Jane Austen', address: 'Plamoodu, Trivandrum', status: 'Pending' },
+  { id: 'V214316499', customer: 'Vincent van Gogh', address: 'Nanthencode, Trivandrum', status: 'In Transit' },
 ];
 
 export default function DashboardScreen({ navigation }: any) {
+  useLayoutEffect(() => {
+    navigation.setOptions({ headerShown: false });
+  }, [navigation]);
+
   const [isOnline, setIsOnline] = useState(true);
   const [filter, setFilter] = useState<FilterOption>('All');
   const [telemetryLogs, setTelemetryLogs] = useState<TelemetryEvent[]>([]);
@@ -219,7 +560,8 @@ export default function DashboardScreen({ navigation }: any) {
   const [deliveries, setDeliveries] = useState<Delivery[]>(DEFAULT_DELIVERIES);
   const [syncQueue, setSyncQueue] = useState<string[]>([]);
 
-  // Smooth layout animation function
+  const syncSpinAnim = useRef(new Animated.Value(0)).current;
+
   const animateListChange = () => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
   };
@@ -259,6 +601,27 @@ export default function DashboardScreen({ navigation }: any) {
   }, [isOnline, syncQueue]);
 
   useEffect(() => {
+    if (isSyncing) {
+      syncSpinAnim.setValue(0);
+      Animated.loop(
+        Animated.timing(syncSpinAnim, {
+          toValue: 1,
+          duration: 1000,
+          easing: Easing.linear,
+          useNativeDriver: true,
+        })
+      ).start();
+    } else {
+      syncSpinAnim.stopAnimation();
+    }
+  }, [isSyncing, syncSpinAnim]);
+
+  const spin = syncSpinAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg'],
+  });
+
+  useEffect(() => {
     const interval = setInterval(() => {
       const event: TelemetryEvent = {
         tracking_id: 'L814315788',
@@ -278,7 +641,11 @@ export default function DashboardScreen({ navigation }: any) {
     return () => clearInterval(interval);
   }, []);
 
-  const markDelivered = (id: string) => {
+  const handlePress = useCallback((item: Delivery) => {
+    navigation.navigate('Detail', { delivery: item });
+  }, [navigation]);
+
+  const handleMarkDelivered = useCallback((id: string) => {
     animateListChange();
     if (isOnline) {
       setDeliveries((prev) => prev.map((d) => (d.id === id ? { ...d, status: 'Delivered' } : d)));
@@ -286,9 +653,9 @@ export default function DashboardScreen({ navigation }: any) {
       setDeliveries((prev) => prev.map((d) => (d.id === id ? { ...d, status: 'Pending Sync' } : d)));
       setSyncQueue((prev) => [...prev, id]);
     }
-  };
+  }, [isOnline]);
 
-  const markFailed = (id: string) => {
+  const handleMarkFailed = useCallback((id: string) => {
     animateListChange();
     if (isOnline) {
       setDeliveries((prev) => prev.map((d) => (d.id === id ? { ...d, status: 'Failed' } : d)));
@@ -296,7 +663,17 @@ export default function DashboardScreen({ navigation }: any) {
       setDeliveries((prev) => prev.map((d) => (d.id === id ? { ...d, status: 'Pending Sync' } : d)));
       setSyncQueue((prev) => [...prev, id]);
     }
-  };
+  }, [isOnline]);
+
+  const renderItem = useCallback(({ item, index }: { item: Delivery; index: number }) => (
+    <DeliveryCard
+      item={item}
+      index={index}
+      onPress={handlePress}
+      onMarkDelivered={handleMarkDelivered}
+      onMarkFailed={handleMarkFailed}
+    />
+  ), [handlePress, handleMarkDelivered, handleMarkFailed]);
 
   const filteredDeliveries = deliveries.filter((d) => {
     if (filter === 'All') return true;
@@ -310,21 +687,24 @@ export default function DashboardScreen({ navigation }: any) {
       <StatusBar barStyle="dark-content" backgroundColor={colors.bg} />
 
       <View style={styles.header}>
-        <View style={styles.headerTop}>
-          <View>
-            <Text style={styles.wordmarkSub}>DRIVER CONSOLE</Text>
+
+        {/* Hero Stack with inline Package */}
+        <View style={styles.headerHero}>
+          <Text style={styles.wordmarkSub}>DRIVER CONSOLE</Text>
+          <View style={styles.titleRow}>
             <Text style={styles.wordmarkTitle}>PulseRoute</Text>
-          </View>
-          <View style={styles.headerActions}>
-            <Ionicons name="notifications-outline" size={24} color={colors.textPrimary} style={{ marginRight: 16 }} />
-            <OnlineToggle value={isOnline} onToggle={() => setIsOnline((v) => !v)} />
+            <FloatingPackage />
           </View>
         </View>
 
-        {/* Sync Banners */}
         {isSyncing && (
           <View style={[styles.syncBanner, styles.syncBannerSyncing]}>
-            <Feather name="refresh-cw" size={14} color={colors.primary} />
+            <AnimatedFeather
+              name="refresh-cw"
+              size={14}
+              color={colors.primary}
+              style={{ transform: [{ rotate: spin }] }}
+            />
             <Text style={[styles.syncBannerText, { color: colors.primary }]}>
                Syncing {syncQueue.length} update{syncQueue.length > 1 ? 's' : ''}...
             </Text>
@@ -339,18 +719,22 @@ export default function DashboardScreen({ navigation }: any) {
           </View>
         )}
 
-        {/* Filter Pills */}
-        <View style={styles.pillRow}>
-          {(['All', 'Pending', 'Transit'] as FilterOption[]).map((f) => (
-            <TouchableOpacity
-              key={f}
-              onPress={() => { animateListChange(); setFilter(f); }}
-              style={[styles.pill, filter === f && styles.pillActive]}
-            >
-              <Text style={[styles.pillText, filter === f && styles.pillTextActive]}>{f}</Text>
-            </TouchableOpacity>
-          ))}
+        {/* Filter Pills and Online Toggle Row */}
+        <View style={styles.filterToggleRow}>
+          <View style={styles.pillRow}>
+            {(['All', 'Pending', 'Transit'] as FilterOption[]).map((f) => (
+              <TouchableOpacity
+                key={f}
+                onPress={() => { animateListChange(); setFilter(f); }}
+                style={[styles.pill, filter === f && styles.pillActive]}
+              >
+                <Text style={[styles.pillText, filter === f && styles.pillTextActive]}>{f}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <OnlineToggle value={isOnline} onToggle={() => setIsOnline((v) => !v)} />
         </View>
+
       </View>
 
       <FlatList
@@ -358,14 +742,11 @@ export default function DashboardScreen({ navigation }: any) {
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
-        renderItem={({ item }) => (
-          <DeliveryCard
-            item={item}
-            onPress={() => navigation.navigate('Detail', { delivery: item })}
-            onMarkDelivered={() => markDelivered(item.id)}
-            onMarkFailed={() => markFailed(item.id)}
-          />
-        )}
+        removeClippedSubviews={Platform.OS === 'android'}
+        initialNumToRender={8}
+        maxToRenderPerBatch={8}
+        windowSize={11}
+        renderItem={renderItem}
         ListEmptyComponent={
           <View style={styles.emptyState}>
             <Feather name="inbox" size={48} color={colors.textTertiary} />
@@ -376,7 +757,7 @@ export default function DashboardScreen({ navigation }: any) {
           <View style={styles.telemetryBox}>
             <View style={styles.telemetryHeader}>
               <Feather name="activity" size={16} color={colors.primary} />
-              <Text style={styles.telemetryTitle}>Live Telemetry</Text>
+              <Text style={styles.telemetryTitle}>LIVE TELEMETRY</Text>
             </View>
             <ScrollView style={styles.telemetryScroll} nestedScrollEnabled>
               {telemetryLogs.length === 0 ? (
@@ -411,95 +792,215 @@ const styles = StyleSheet.create({
 
   header: {
     paddingHorizontal: 24,
-    paddingTop: 20,
-    paddingBottom: 16,
+    paddingTop: Platform.OS === 'ios' ? 12 : 32,
+    paddingBottom: 20, 
     backgroundColor: colors.bg,
   },
-  headerTop: {
+  headerHero: {
+    alignItems: 'flex-start',
+    marginBottom: 24, 
+    minHeight: 56,
+  },
+  titleRow: {
     flexDirection: 'row',
+    alignItems: 'center', 
+  },
+  
+  // Controls Row containing both Filters and Toggle
+  filterToggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 24,
   },
-  headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  pillRow: { 
+    flexDirection: 'row', 
+    gap: 8, 
   },
-  wordmarkSub: { fontSize: 12, color: colors.textSecondary, letterSpacing: 1, fontWeight: '600', marginBottom: 4 },
-  wordmarkTitle: { fontSize: 26, fontWeight: '800', color: colors.textPrimary, letterSpacing: -0.5 },
 
-  toggleRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  toggleLabel: { fontSize: 14, fontWeight: '600' },
+  // Floating Package Adjustments
+  floatingContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 50, 
+    height: 50, 
+    marginLeft: 8, 
+    marginTop: -6, 
+  },
+  packageEmoji: {
+    fontSize: 34, 
+    zIndex: 2,
+    lineHeight: 40, 
+  },
+  packageShadow: {
+    position: 'absolute',
+    bottom: 4, 
+    width: 22,
+    height: 5,
+    backgroundColor: 'rgba(0,0,0,1)',
+    borderRadius: 10,
+    zIndex: 1,
+  },
+
+  wordmarkSub: { 
+    fontSize: 11, 
+    color: colors.textSecondary, 
+    letterSpacing: 1.5, 
+    fontWeight: '700', 
+    textTransform: 'uppercase',
+    marginBottom: 6 
+  },
+  wordmarkTitle: { 
+    fontSize: 32, 
+    fontWeight: '800', 
+    color: colors.textPrimary, 
+    letterSpacing: -0.8 
+  },
+
+  toggleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  toggleLabel: { fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 },
   toggleLabelOnline: { color: colors.primary },
   toggleLabelOffline: { color: colors.textSecondary },
-  toggleTrack: { width: 56, height: 32, borderRadius: 16, justifyContent: 'center' },
-  toggleThumb: { width: 24, height: 24, borderRadius: 12, backgroundColor: colors.surface, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 3, elevation: 3 },
+  toggleTrack: { width: 44, height: 26, borderRadius: 9999, justifyContent: 'center' },
+  toggleThumb: { width: 20, height: 20, borderRadius: 9999, backgroundColor: colors.surface, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 3, elevation: 3 },
 
   syncBanner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.pending.bg, paddingVertical: 12, borderRadius: 12, marginBottom: 20 },
   syncBannerSyncing: { backgroundColor: colors.primaryLight },
   syncBannerText: { fontSize: 13, color: colors.pending.text, fontWeight: '600' },
 
-  pillRow: { flexDirection: 'row', gap: 10 },
-  pill: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
+  pill: { 
+    paddingHorizontal: 14, 
+    paddingVertical: 8, 
+    borderRadius: 9999, 
+    backgroundColor: colors.surface, 
+    borderWidth: 1, 
+    borderColor: colors.border 
+  },
   pillActive: { backgroundColor: colors.textPrimary, borderColor: colors.textPrimary },
-  pillText: { fontSize: 14, color: colors.textSecondary, fontWeight: '500' },
-  pillTextActive: { color: colors.surface, fontWeight: '600' },
+  pillText: { fontSize: 12, color: colors.textSecondary, fontWeight: '600' },
+  pillTextActive: { color: colors.surface, fontWeight: '700' },
 
   listContent: { paddingHorizontal: 24, paddingBottom: 40, paddingTop: 8 },
 
-  // Card Styling
-  card: { 
-    backgroundColor: colors.surface, 
-    borderRadius: 24, 
-    padding: 20, 
+  card: {
+    backgroundColor: colors.surface,
+    borderRadius: 20,
+    padding: 20,
     marginBottom: 16,
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.06,
-    shadowRadius: 20,
-    elevation: 4,
+    borderWidth: 1,
+    borderColor: colors.border,
+    overflow: 'hidden',
   },
   cardActive: {
     backgroundColor: colors.primaryLight,
-    borderWidth: 1,
-    borderColor: 'rgba(139, 92, 246, 0.15)',
+    borderColor: colors.borderActive, 
   },
-  cardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
-  cardIconBox: { width: 44, height: 44, borderRadius: 14, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 },
-  customerName: { fontSize: 16, fontWeight: '700', color: colors.textPrimary, marginBottom: 2 },
-  orderId: { fontSize: 13, color: colors.textSecondary, fontWeight: '500' },
-  badge: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10 },
-  badgeText: { fontSize: 12, fontWeight: '600' },
-
-  routingContainer: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
+  pressOverlay: {
+    backgroundColor: 'rgba(59, 130, 246, 0.08)',
+    borderRadius: 20,
+    zIndex: 10,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
-    backgroundColor: 'rgba(255, 255, 255, 0.5)',
-    padding: 12,
-    borderRadius: 16,
+    zIndex: 2,
   },
-  routePoint: { flex: 1 },
-  routeLine: { flex: 1, height: 1, borderStyle: 'dashed', borderWidth: 1, borderColor: colors.textTertiary, marginHorizontal: 10, borderRadius: 1 },
-  routeDotOrigin: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.textTertiary, marginBottom: 6 },
-  routeDotDest: { width: 10, height: 10, borderRadius: 5, marginBottom: 6 },
-  routeText: { fontSize: 12, color: colors.textSecondary, fontWeight: '500' },
+  customerName: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    marginBottom: 4,
+    letterSpacing: -0.3,
+  },
+  orderId: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    fontWeight: '600',
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+  },
+  badge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 9999, 
+    marginLeft: 12,
+    borderWidth: 1,
+  },
+  badgeText: {
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
+  cardDivider: {
+    height: 1,
+    backgroundColor: colors.border,
+    marginVertical: 16,
+    zIndex: 2,
+  },
+
+  addressSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    zIndex: 2,
+  },
+  addressIconWrapper: {
+    width: 36,
+    height: 36,
+    borderRadius: 9999, 
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 14,
+  },
+  addressTextWrapper: {
+    flex: 1,
+  },
+  addressLabel: {
+    fontSize: 10,
+    fontWeight: '800', 
+    color: colors.textTertiary,
+    letterSpacing: 1.2,
+    textTransform: 'uppercase', 
+    marginBottom: 4,
+  },
+  addressValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.textPrimary,
+    lineHeight: 20,
+  },
+
+  shimmerOverlay: {
+    width: 80,
+    backgroundColor: 'rgba(255, 255, 255, 0.4)',
+    transform: [{ skewX: '-20deg' }],
+  },
 
   emptyState: { paddingTop: 60, alignItems: 'center', opacity: 0.6 },
   emptyText: { fontSize: 15, color: colors.textSecondary, marginTop: 12, fontWeight: '500' },
 
-  // Telemetry Box
-  telemetryBox: { marginTop: 24, backgroundColor: colors.surface, borderRadius: 24, padding: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.03, shadowRadius: 10, elevation: 2 },
+  telemetryBox: { 
+    marginTop: 24, 
+    backgroundColor: colors.surface, 
+    borderRadius: 24, 
+    padding: 20, 
+    borderWidth: 1,
+    borderColor: colors.border 
+  },
   telemetryHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16 },
-  telemetryTitle: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
+  telemetryTitle: { 
+    fontSize: 12, 
+    fontWeight: '800', 
+    color: colors.textPrimary,
+    letterSpacing: 1.2,
+    textTransform: 'uppercase'
+  },
   telemetryScroll: { maxHeight: 200 },
   logBlock: { paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
   logBlockLatest: { backgroundColor: colors.primaryLight, borderRadius: 12, paddingHorizontal: 12, borderBottomWidth: 0, marginBottom: 8 },
   telemetryRow: { fontSize: 12, color: colors.textSecondary, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace', marginBottom: 4 },
   telemetryRowLatest: { color: colors.primary, fontWeight: '600' },
 
-  // Swipe Actions
-  actionLeft: { backgroundColor: colors.delivered.pip, justifyContent: 'center', alignItems: 'center', width: 100, borderRadius: 24, marginBottom: 16 },
-  actionRight: { backgroundColor: colors.failed.pip, justifyContent: 'center', alignItems: 'center', width: 100, borderRadius: 24, marginBottom: 16 },
+  actionLeft: { backgroundColor: colors.delivered.pip, justifyContent: 'center', alignItems: 'center', width: 100, borderRadius: 20, marginBottom: 16 },
+  actionRight: { backgroundColor: colors.failed.pip, justifyContent: 'center', alignItems: 'center', width: 100, borderRadius: 20, marginBottom: 16 },
   actionText: { color: '#FFFFFF', fontWeight: '700', fontSize: 13, marginTop: 4 },
 });

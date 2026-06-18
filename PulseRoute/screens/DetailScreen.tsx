@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useLayoutEffect } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   StyleSheet,
   SafeAreaView,
   StatusBar,
+  Platform,
 } from 'react-native';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -20,28 +21,26 @@ interface Delivery {
   status: DeliveryStatus;
 }
 
-// ─── Design tokens ────────────────────────────────────────────────────────────
-// Same status palette as the dashboard, plus a purple "primary" accent for the
-// new hero / progress / action elements.
+// ─── Design Tokens (Blue Theme - Arc / Linear Aesthetic) ──────────────────────
 
 const colors = {
-  bg: '#F7F7FC',
+  bg: '#F8F9FB',
   surface: '#FFFFFF',
-  border: '#ECEBF2',
-  borderStrong: '#DAD8E6',
-  textPrimary: '#1C1C28',
-  textSecondary: '#6E6C80',
-  textTertiary: '#A6A4B5',
+  border: '#E5E7EB',
+  borderStrong: '#D1D5DB',
+  textPrimary: '#111827',
+  textSecondary: '#6B7280',
+  textTertiary: '#9CA3AF',
 
-  primary: '#6C5CE7',
-  primaryDark: '#4D3FCB',
-  primaryLight: '#EFEBFF',
+  primary: '#3B82F6',
+  primaryDark: '#1D4ED8',
+  primaryLight: '#EFF6FF',
 
-  pending:     { bg: '#FFF4E0', text: '#9A6100', pip: '#F59E0B' },
-  transit:     { bg: '#E5F0FF', text: '#1A4FA3', pip: '#3B82F6' },
-  delivered:   { bg: '#E3FAF0', text: '#0F6E56', pip: '#22C55E' },
-  pendingSync: { bg: '#F3F0FF', text: '#5B21B6', pip: '#8B5CF6' },
-  failed:      { bg: '#FEF2F2', text: '#991B1B', pip: '#EF4444' },
+  pending:     { bg: '#FFFBEB', text: '#D97706', pip: '#F59E0B', border: 'rgba(245, 158, 11, 0.2)' },
+  transit:     { bg: '#EFF6FF', text: '#3B82F6', pip: '#3B82F6', border: 'rgba(59, 130, 246, 0.2)' },
+  delivered:   { bg: '#ECFDF5', text: '#059669', pip: '#10B981', border: 'rgba(16, 185, 129, 0.2)' },
+  pendingSync: { bg: '#F3F4F6', text: '#4B5563', pip: '#6B7280', border: 'rgba(107, 114, 128, 0.2)' },
+  failed:      { bg: '#FEF2F2', text: '#DC2626', pip: '#EF4444', border: 'rgba(239, 68, 68, 0.2)' },
 } as const;
 
 function getStatusColors(status: DeliveryStatus) {
@@ -86,7 +85,7 @@ function StepTimeline({ status }: { status: DeliveryStatus }) {
                   failedHere && styles.timelineDotFailed,
                 ]}
               >
-                <Text style={styles.timelineDotText}>
+                <Text style={[styles.timelineDotText, (done || current) && { color: current && !failedHere ? colors.primary : '#FFF' }]}>
                   {failedHere ? '✕' : done ? '✓' : i + 1}
                 </Text>
               </View>
@@ -137,33 +136,29 @@ function StatChip({ icon, value, label }: { icon: string; value: string; label: 
 // ─── Detail Screen ────────────────────────────────────────────────────────────
 
 export default function DetailScreen({ route, navigation }: any) {
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerShown: false,
+    });
+  }, [navigation]);
+
   const { delivery }: { delivery: Delivery } = route.params;
   const sc = getStatusColors(delivery.status);
   const canAct = delivery.status === 'Pending' || delivery.status === 'In Transit' || delivery.status === 'Pending Sync';
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle="dark-content" backgroundColor={colors.bg} />
 
-      {/* ── Header ── */}
-      <View style={styles.header}>
-        <TouchableOpacity
+      {/* Top Navigation Bar */}
+      <View style={styles.topBar}>
+         <TouchableOpacity
           onPress={() => navigation?.goBack?.()}
           style={styles.iconButton}
           accessibilityLabel="Go back"
         >
           <Text style={styles.iconButtonText}>←</Text>
         </TouchableOpacity>
-
-        <View style={styles.headerTitleWrap}>
-          <Text style={styles.headerTitle}>Delivery Details</Text>
-          <Text style={styles.headerSubtitle}>{delivery.id}</Text>
-        </View>
-
-        <View style={[styles.badge, { backgroundColor: sc.bg }]}>
-          <View style={[styles.badgeDot, { backgroundColor: sc.pip }]} />
-          <Text style={[styles.badgeText, { color: sc.text }]}>{delivery.status}</Text>
-        </View>
       </View>
 
       <ScrollView
@@ -181,12 +176,17 @@ export default function DetailScreen({ route, navigation }: any) {
               <Text style={styles.heroName}>{delivery.customer}</Text>
               <Text style={styles.heroAddress} numberOfLines={2}>📍 {delivery.address}</Text>
             </View>
+            
+            <View style={[styles.badge, { backgroundColor: sc.bg, borderColor: sc.border }]}>
+              <View style={[styles.badgeDot, { backgroundColor: sc.pip }]} />
+              <Text style={[styles.badgeText, { color: sc.text }]}>{delivery.status}</Text>
+            </View>
           </View>
 
           <View style={styles.divider} />
 
           <View style={styles.chipRow}>
-            <View style={[styles.infoChip, { backgroundColor: colors.primaryLight }]}>
+            <View style={[styles.infoChip, { backgroundColor: colors.primaryLight, borderColor: 'rgba(59, 130, 246, 0.2)' }]}>
               <Text style={[styles.infoChipText, { color: colors.primaryDark }]}>🏷️ Express Priority</Text>
             </View>
             <View style={styles.infoChip}>
@@ -299,72 +299,81 @@ export default function DetailScreen({ route, navigation }: any) {
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: colors.bg },
   scroll: { flex: 1 },
-  scrollContent: { padding: 16, paddingBottom: 32, gap: 12 },
+  scrollContent: { padding: 16, paddingBottom: 32, gap: 16 },
 
-  // Header
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
+  // Top Navigation Bar
+  topBar: {
     paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 14,
-    backgroundColor: colors.surface,
-    borderBottomWidth: 0.5,
-    borderBottomColor: colors.border,
+    paddingTop: Platform.OS === 'ios' ? 8 : 16,
+    paddingBottom: 8,
+    backgroundColor: colors.bg,
   },
   iconButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
-    backgroundColor: colors.bg,
-    borderWidth: 0.5,
-    borderColor: colors.border,
+    width: 44,
+    height: 44,
+    borderRadius: 9999, // Pure circle
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border, // Crisp border, no shadow
     alignItems: 'center',
     justifyContent: 'center',
   },
-  iconButtonText: { fontSize: 18, color: colors.textPrimary },
-  headerTitleWrap: { flex: 1 },
-  headerTitle: { fontSize: 16, fontWeight: '600', color: colors.textPrimary, letterSpacing: -0.2 },
-  headerSubtitle: { fontSize: 12, color: colors.textTertiary, fontFamily: 'Courier', marginTop: 1 },
+  iconButtonText: { fontSize: 20, color: colors.textPrimary },
 
-  badge: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20 },
+  badge: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    gap: 6, 
+    paddingHorizontal: 12, 
+    paddingVertical: 6, 
+    borderRadius: 9999, // Pill shape
+    borderWidth: 1,
+  },
   badgeDot: { width: 6, height: 6, borderRadius: 3 },
-  badgeText: { fontSize: 11, fontWeight: '600' },
+  badgeText: { fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 },
 
   // Generic card
   card: {
     backgroundColor: colors.surface,
-    borderRadius: 18,
-    borderWidth: 0.5,
-    borderColor: colors.border,
-    padding: 16,
-    shadowColor: '#1C1C28',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.04,
-    shadowRadius: 10,
-    elevation: 1,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: colors.border, // No shadows
+    padding: 20,
   },
-  sectionLabel: { fontSize: 11, fontWeight: '600', color: colors.textTertiary, letterSpacing: 0.7, marginBottom: 12 },
+  sectionLabel: { 
+    fontSize: 10, 
+    fontWeight: '800', 
+    color: colors.textTertiary, 
+    letterSpacing: 1.2, 
+    textTransform: 'uppercase',
+    marginBottom: 16 
+  },
 
   // Hero card
-  heroCard: { gap: 14 },
-  heroTop: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  heroCard: { gap: 16 },
+  heroTop: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
   heroAvatar: {
     width: 48,
     height: 48,
-    borderRadius: 16,
+    borderRadius: 9999, // Circle avatar
     backgroundColor: colors.primaryLight,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  heroAvatarText: { fontSize: 18, fontWeight: '700', color: colors.primaryDark },
-  heroName: { fontSize: 17, fontWeight: '600', color: colors.textPrimary, marginBottom: 3 },
-  heroAddress: { fontSize: 13, color: colors.textSecondary, lineHeight: 18 },
+  heroAvatarText: { fontSize: 18, fontWeight: '800', color: colors.primaryDark },
+  heroName: { fontSize: 18, fontWeight: '800', color: colors.textPrimary, marginBottom: 4, letterSpacing: -0.3 },
+  heroAddress: { fontSize: 13, color: colors.textSecondary, lineHeight: 18, fontWeight: '500' },
   divider: { height: 1, backgroundColor: colors.border },
   chipRow: { flexDirection: 'row', gap: 8 },
-  infoChip: { backgroundColor: colors.bg, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 7 },
-  infoChipText: { fontSize: 12, fontWeight: '500', color: colors.textSecondary },
+  infoChip: { 
+    backgroundColor: colors.surface, 
+    borderRadius: 9999, 
+    paddingHorizontal: 12, 
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  infoChipText: { fontSize: 12, fontWeight: '600', color: colors.textSecondary },
 
   // Timeline
   timelineRow: { flexDirection: 'row', alignItems: 'flex-start' },
@@ -374,31 +383,31 @@ const styles = StyleSheet.create({
     height: 28,
     borderRadius: 14,
     backgroundColor: colors.bg,
-    borderWidth: 1.5,
+    borderWidth: 2, // Thicker, crisper border for the timeline
     borderColor: colors.borderStrong,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 6,
+    marginBottom: 8,
   },
   timelineDotDone: { backgroundColor: colors.primary, borderColor: colors.primary },
   timelineDotCurrent: { backgroundColor: colors.primaryLight, borderColor: colors.primary },
   timelineDotFailed: { backgroundColor: colors.failed.pip, borderColor: colors.failed.pip },
-  timelineDotText: { fontSize: 12, fontWeight: '700', color: colors.textSecondary },
-  timelineLabel: { fontSize: 11, color: colors.textTertiary, textAlign: 'center' },
-  timelineLabelActive: { color: colors.textPrimary, fontWeight: '500' },
+  timelineDotText: { fontSize: 12, fontWeight: '800', color: colors.textSecondary },
+  timelineLabel: { fontSize: 11, color: colors.textTertiary, textAlign: 'center', fontWeight: '600' },
+  timelineLabelActive: { color: colors.textPrimary, fontWeight: '700' },
   timelineConnector: { flex: 1, height: 2, backgroundColor: colors.border, marginTop: 13, marginHorizontal: -8 },
   timelineConnectorDone: { backgroundColor: colors.primary },
 
   // Route
-  routeRow: { flexDirection: 'row', gap: 14 },
+  routeRow: { flexDirection: 'row', gap: 16 },
   routeMarkerCol: { alignItems: 'center', paddingTop: 4 },
   routeDot: { width: 10, height: 10, borderRadius: 5 },
   routeDotEnd: { backgroundColor: colors.textPrimary },
   routeLine: { width: 2, flex: 1, minHeight: 32, backgroundColor: colors.border, marginVertical: 4 },
   routeTextCol: { flex: 1, justifyContent: 'space-between' },
   routePoint: { marginBottom: 18 },
-  routePointLabel: { fontSize: 10, fontWeight: '600', color: colors.textTertiary, letterSpacing: 0.6, marginBottom: 3 },
-  routePointValue: { fontSize: 13, color: colors.textPrimary },
+  routePointLabel: { fontSize: 10, fontWeight: '800', color: colors.textTertiary, letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 4 },
+  routePointValue: { fontSize: 14, color: colors.textPrimary, fontWeight: '600' },
 
   // Map placeholder
   mapCard: { padding: 12, gap: 12 },
@@ -406,6 +415,8 @@ const styles = StyleSheet.create({
     height: 160,
     borderRadius: 14,
     backgroundColor: colors.primaryLight,
+    borderWidth: 1,
+    borderColor: 'rgba(59, 130, 246, 0.2)', // Soft border for map area
     overflow: 'hidden',
     justifyContent: 'center',
   },
@@ -425,79 +436,85 @@ const styles = StyleSheet.create({
   mapPinText: { fontSize: 16, color: colors.primary },
   mapBadge: {
     position: 'absolute',
-    top: 10,
-    left: 10,
+    top: 12,
+    left: 12,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
     backgroundColor: colors.surface,
-    borderRadius: 20,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+    borderRadius: 9999,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
   },
   mapBadgeDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.delivered.pip },
-  mapBadgeText: { fontSize: 11, fontWeight: '500', color: colors.textPrimary },
-  mapButton: { alignItems: 'center', paddingVertical: 10, borderRadius: 12, backgroundColor: colors.bg },
-  mapButtonText: { fontSize: 13, fontWeight: '600', color: colors.primaryDark },
+  mapBadgeText: { fontSize: 11, fontWeight: '700', color: colors.textPrimary, letterSpacing: 0.3 },
+  mapButton: { alignItems: 'center', paddingVertical: 12, borderRadius: 9999, backgroundColor: colors.bg, borderWidth: 1, borderColor: colors.border },
+  mapButtonText: { fontSize: 13, fontWeight: '800', color: colors.primaryDark },
 
   // Instructions
-  noteRow: { flexDirection: 'row', gap: 10, marginBottom: 10, alignItems: 'flex-start' },
+  noteRow: { flexDirection: 'row', gap: 12, marginBottom: 12, alignItems: 'flex-start' },
   noteIcon: { fontSize: 15, marginTop: 1 },
-  noteText: { flex: 1, fontSize: 13, color: colors.textSecondary, lineHeight: 19 },
+  noteText: { flex: 1, fontSize: 13, color: colors.textSecondary, lineHeight: 20, fontWeight: '500' },
 
   // Telemetry grid
-  statGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  statGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   statChip: {
     flexBasis: '47%',
     flexGrow: 1,
-    backgroundColor: colors.bg,
-    borderRadius: 14,
-    paddingVertical: 12,
-    paddingHorizontal: 12,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
   },
-  statChipIcon: { fontSize: 15, marginBottom: 6 },
-  statChipValue: { fontSize: 15, fontWeight: '600', color: colors.textPrimary },
-  statChipLabel: { fontSize: 10, color: colors.textTertiary, letterSpacing: 0.5, marginTop: 2 },
+  statChipIcon: { fontSize: 16, marginBottom: 8 },
+  statChipValue: { fontSize: 16, fontWeight: '800', color: colors.textPrimary, letterSpacing: -0.5 },
+  statChipLabel: { fontSize: 10, color: colors.textTertiary, letterSpacing: 1.2, textTransform: 'uppercase', marginTop: 4, fontWeight: '800' },
 
   // Bottom action bar
   actionBar: {
     flexDirection: 'row',
-    gap: 10,
+    gap: 12,
     paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingVertical: 16,
     backgroundColor: colors.surface,
-    borderTopWidth: 0.5,
+    borderTopWidth: 1,
     borderTopColor: colors.border,
   },
   callButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 14,
-    backgroundColor: colors.textPrimary,
+    width: 54,
+    height: 54,
+    borderRadius: 9999, // Pill shape
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  callButtonText: { fontSize: 18 },
+  callButtonText: { fontSize: 20 },
   failButton: {
     flex: 1,
-    height: 48,
-    borderRadius: 14,
+    height: 54,
+    borderRadius: 9999, // Pill shape
     borderWidth: 1.5,
     borderColor: colors.failed.pip,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  failButtonText: { fontSize: 14, fontWeight: '600', color: colors.failed.pip },
+  failButtonText: { fontSize: 14, fontWeight: '800', color: colors.failed.pip },
   deliveredButton: {
     flex: 1.4,
-    height: 48,
-    borderRadius: 14,
+    height: 54,
+    borderRadius: 9999, // Pill shape
     backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  deliveredButtonText: { fontSize: 14, fontWeight: '600', color: '#FFFFFF' },
+  deliveredButtonText: { fontSize: 14, fontWeight: '800', color: '#FFFFFF' },
 
   statusBar: { alignItems: 'center', justifyContent: 'center', gap: 8 },
-  statusBarText: { fontSize: 13, fontWeight: '500' },
+  statusBarText: { fontSize: 14, fontWeight: '700' },
 });
