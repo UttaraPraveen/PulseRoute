@@ -83,6 +83,7 @@ PulseRoute is designed for delivery couriers operating in environments with unre
 ```bash
 git clone <repository-url>
 cd PulseRoute
+cd PulseRoute
 ```
 
 ### Install Dependencies
