@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useCallback, useLayoutEffect, memo 
 import { saveData, loadData } from '../storage/storage';
 import { Swipeable } from 'react-native-gesture-handler';
 import { Feather } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import {
   View,
   Text,
@@ -683,118 +684,129 @@ export default function DashboardScreen({ navigation }: any) {
   });
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor={colors.bg} />
-
-      <View style={styles.header}>
-
-        {/* Hero Stack with inline Package */}
-        <View style={styles.headerHero}>
-          <Text style={styles.wordmarkSub}>DRIVER CONSOLE</Text>
-          <View style={styles.titleRow}>
-            <Text style={styles.wordmarkTitle}>PulseRoute</Text>
-            <FloatingPackage />
-          </View>
-        </View>
-
-        {isSyncing && (
-          <View style={[styles.syncBanner, styles.syncBannerSyncing]}>
-            <AnimatedFeather
-              name="refresh-cw"
-              size={14}
-              color={colors.primary}
-              style={{ transform: [{ rotate: spin }] }}
-            />
-            <Text style={[styles.syncBannerText, { color: colors.primary }]}>
-               Syncing {syncQueue.length} update{syncQueue.length > 1 ? 's' : ''}...
-            </Text>
-          </View>
-        )}
-        {!isOnline && syncQueue.length > 0 && !isSyncing && (
-          <View style={styles.syncBanner}>
-            <Feather name="wifi-off" size={14} color={colors.pending.text} />
-            <Text style={styles.syncBannerText}>
-               {syncQueue.length} queued — waiting for connection
-            </Text>
-          </View>
-        )}
-
-        {/* Filter Pills and Online Toggle Row */}
-        <View style={styles.filterToggleRow}>
-          <View style={styles.pillRow}>
-            {(['All', 'Pending', 'Transit'] as FilterOption[]).map((f) => (
-              <TouchableOpacity
-                key={f}
-                onPress={() => { animateListChange(); setFilter(f); }}
-                style={[styles.pill, filter === f && styles.pillActive]}
-              >
-                <Text style={[styles.pillText, filter === f && styles.pillTextActive]}>{f}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-          <OnlineToggle value={isOnline} onToggle={() => setIsOnline((v) => !v)} />
-        </View>
-
-      </View>
-
-      <FlatList
-        data={filteredDeliveries}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.listContent}
-        showsVerticalScrollIndicator={false}
-        removeClippedSubviews={Platform.OS === 'android'}
-        initialNumToRender={8}
-        maxToRenderPerBatch={8}
-        windowSize={11}
-        renderItem={renderItem}
-        ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <Feather name="inbox" size={48} color={colors.textTertiary} />
-            <Text style={styles.emptyText}>No deliveries found.</Text>
-          </View>
-        }
-        ListFooterComponent={
-          <View style={styles.telemetryBox}>
-            <View style={styles.telemetryHeader}>
-              <Feather name="activity" size={16} color={colors.primary} />
-              <Text style={styles.telemetryTitle}>LIVE TELEMETRY</Text>
-            </View>
-            <ScrollView style={styles.telemetryScroll} nestedScrollEnabled>
-              {telemetryLogs.length === 0 ? (
-                <Text style={styles.telemetryRow}>Connecting to satellite...</Text>
-              ) : (
-                telemetryLogs.map((log, i) => (
-                  <View key={log.timestamp + '-' + i} style={[styles.logBlock, i === 0 && styles.logBlockLatest]}>
-                    <Text style={[styles.telemetryRow, i === 0 && styles.telemetryRowLatest]}>
-                      Tracking: {log.tracking_id}
-                    </Text>
-                    <Text style={[styles.telemetryRow, i === 0 && styles.telemetryRowLatest]}>
-                      📍 {log.telemetry.latitude.toFixed(4)}, {log.telemetry.longitude.toFixed(4)}
-                    </Text>
-                    <Text style={[styles.telemetryRow, i === 0 && styles.telemetryRowLatest]}>
-                      🚗 {log.telemetry.speed_kmh} km/h   🔋 {log.device_metrics.battery_level}%   📶 {log.device_metrics.network_latency_ms}ms
-                    </Text>
-                  </View>
-                ))
-              )}
-            </ScrollView>
-          </View>
-        }
+    <View style={styles.container}>
+      {/* Background Ombre Effect */}
+      <LinearGradient
+        colors={['#BFDBFE', '#EFF6FF', colors.bg]}
+        style={StyleSheet.absoluteFill}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0, y: 0.5 }}
       />
-    </SafeAreaView>
+      
+      <SafeAreaView style={styles.safeArea}>
+        <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent={true} />
+
+        <View style={styles.header}>
+
+          {/* Hero Stack with inline Package */}
+          <View style={styles.headerHero}>
+            <Text style={styles.wordmarkSub}>DRIVER CONSOLE</Text>
+            <View style={styles.titleRow}>
+              <Text style={styles.wordmarkTitle}>PulseRoute</Text>
+              <FloatingPackage />
+            </View>
+          </View>
+
+          {isSyncing && (
+            <View style={[styles.syncBanner, styles.syncBannerSyncing]}>
+              <AnimatedFeather
+                name="refresh-cw"
+                size={14}
+                color={colors.primary}
+                style={{ transform: [{ rotate: spin }] }}
+              />
+              <Text style={[styles.syncBannerText, { color: colors.primary }]}>
+                 Syncing {syncQueue.length} update{syncQueue.length > 1 ? 's' : ''}...
+              </Text>
+            </View>
+          )}
+          {!isOnline && syncQueue.length > 0 && !isSyncing && (
+            <View style={styles.syncBanner}>
+              <Feather name="wifi-off" size={14} color={colors.pending.text} />
+              <Text style={styles.syncBannerText}>
+                 {syncQueue.length} queued — waiting for connection
+              </Text>
+            </View>
+          )}
+
+          {/* Filter Pills and Online Toggle Row */}
+          <View style={styles.filterToggleRow}>
+            <View style={styles.pillRow}>
+              {(['All', 'Pending', 'Transit'] as FilterOption[]).map((f) => (
+                <TouchableOpacity
+                  key={f}
+                  onPress={() => { animateListChange(); setFilter(f); }}
+                  style={[styles.pill, filter === f && styles.pillActive]}
+                >
+                  <Text style={[styles.pillText, filter === f && styles.pillTextActive]}>{f}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <OnlineToggle value={isOnline} onToggle={() => setIsOnline((v) => !v)} />
+          </View>
+
+        </View>
+
+        <FlatList
+          data={filteredDeliveries}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+          removeClippedSubviews={Platform.OS === 'android'}
+          initialNumToRender={8}
+          maxToRenderPerBatch={8}
+          windowSize={11}
+          renderItem={renderItem}
+          ListEmptyComponent={
+            <View style={styles.emptyState}>
+              <Feather name="inbox" size={48} color={colors.textTertiary} />
+              <Text style={styles.emptyText}>No deliveries found.</Text>
+            </View>
+          }
+          ListFooterComponent={
+            <View style={styles.telemetryBox}>
+              <View style={styles.telemetryHeader}>
+                <Feather name="activity" size={16} color={colors.primary} />
+                <Text style={styles.telemetryTitle}>LIVE TELEMETRY</Text>
+              </View>
+              <ScrollView style={styles.telemetryScroll} nestedScrollEnabled>
+                {telemetryLogs.length === 0 ? (
+                  <Text style={styles.telemetryRow}>Connecting to satellite...</Text>
+                ) : (
+                  telemetryLogs.map((log, i) => (
+                    <View key={log.timestamp + '-' + i} style={[styles.logBlock, i === 0 && styles.logBlockLatest]}>
+                      <Text style={[styles.telemetryRow, i === 0 && styles.telemetryRowLatest]}>
+                        Tracking: {log.tracking_id}
+                      </Text>
+                      <Text style={[styles.telemetryRow, i === 0 && styles.telemetryRowLatest]}>
+                        📍 {log.telemetry.latitude.toFixed(4)}, {log.telemetry.longitude.toFixed(4)}
+                      </Text>
+                      <Text style={[styles.telemetryRow, i === 0 && styles.telemetryRowLatest]}>
+                        🚗 {log.telemetry.speed_kmh} km/h   🔋 {log.device_metrics.battery_level}%   📶 {log.device_metrics.network_latency_ms}ms
+                      </Text>
+                    </View>
+                  ))
+                )}
+              </ScrollView>
+            </View>
+          }
+        />
+      </SafeAreaView>
+    </View>
   );
 }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: colors.bg },
+  container: { flex: 1 },
+  safeArea: { flex: 1, backgroundColor: 'transparent' },
 
   header: {
     paddingHorizontal: 24,
-    paddingTop: Platform.OS === 'ios' ? 12 : 32,
+    paddingTop: Platform.OS === 'ios' ? 12 : 48, // slightly padded for the translucent status bar
     paddingBottom: 20, 
-    backgroundColor: colors.bg,
+    backgroundColor: 'transparent',
   },
   headerHero: {
     alignItems: 'flex-start',

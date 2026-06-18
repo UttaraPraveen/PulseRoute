@@ -1,4 +1,4 @@
-import React, { useLayoutEffect } from 'react';
+import React, { useLayoutEffect, useRef, useEffect, memo } from 'react';
 import {
   View,
   Text,
@@ -8,7 +8,10 @@ import {
   SafeAreaView,
   StatusBar,
   Platform,
+  Animated,
+  Easing,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -52,6 +55,63 @@ function getStatusColors(status: DeliveryStatus) {
     case 'Failed':       return colors.failed;
   }
 }
+
+// ─── 3D Floating Graphic ──────────────────────────────────────────────────────
+
+const FloatingTruck = memo(function FloatingTruck() {
+  const floatAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(floatAnim, {
+          toValue: -6, 
+          duration: 1800,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(floatAnim, {
+          toValue: 0, 
+          duration: 1800,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  }, [floatAnim]);
+
+  const shadowScale = floatAnim.interpolate({
+    inputRange: [-6, 0],
+    outputRange: [0.6, 1],
+  });
+
+  const shadowOpacity = floatAnim.interpolate({
+    inputRange: [-6, 0],
+    outputRange: [0.2, 0.4],
+  });
+
+  return (
+    <View style={styles.floatingContainer}>
+      <Animated.Text 
+        style={[
+          styles.graphicEmoji, 
+          { transform: [{ translateY: floatAnim }] }
+        ]}
+      >
+        🚚
+      </Animated.Text>
+      <Animated.View
+        style={[
+          styles.graphicShadow,
+          {
+            transform: [{ scale: shadowScale }],
+            opacity: shadowOpacity,
+          },
+        ]}
+      />
+    </View>
+  );
+});
 
 // ─── Step progress ────────────────────────────────────────────────────────────
 
@@ -147,166 +207,185 @@ export default function DetailScreen({ route, navigation }: any) {
   const canAct = delivery.status === 'Pending' || delivery.status === 'In Transit' || delivery.status === 'Pending Sync';
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor={colors.bg} />
+    <View style={styles.container}>
+      {/* Background Ombre Effect - White at top fading into Prominent Blue */}
+      <LinearGradient
+        colors={['#FFFFFF', '#93C5FD', colors.primary]}
+        style={StyleSheet.absoluteFill}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0, y: 0.4 }}
+      />
 
-      {/* Top Navigation Bar */}
-      <View style={styles.topBar}>
-         <TouchableOpacity
-          onPress={() => navigation?.goBack?.()}
-          style={styles.iconButton}
-          accessibilityLabel="Go back"
+      <SafeAreaView style={styles.safeArea}>
+        <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent={true} />
+
+        {/* Top Navigation Bar with Inline Title & 3D Truck */}
+        <View style={styles.topBar}>
+           <TouchableOpacity
+            onPress={() => navigation?.goBack?.()}
+            style={styles.iconButton}
+            accessibilityLabel="Go back"
+          >
+            <Text style={styles.iconButtonText}>←</Text>
+          </TouchableOpacity>
+          
+          <View style={styles.headerHero}>
+            <Text style={styles.headerTitle}>Delivery Detail</Text>
+            <FloatingTruck />
+          </View>
+        </View>
+
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
         >
-          <Text style={styles.iconButtonText}>←</Text>
-        </TouchableOpacity>
-      </View>
-
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* ── Hero: customer + tracking ── */}
-        <SectionCard style={styles.heroCard}>
-          <View style={styles.heroTop}>
-            <View style={styles.heroAvatar}>
-              <Text style={styles.heroAvatarText}>{delivery.customer.charAt(0)}</Text>
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.heroName}>{delivery.customer}</Text>
-              <Text style={styles.heroAddress} numberOfLines={2}>📍 {delivery.address}</Text>
-            </View>
-            
-            <View style={[styles.badge, { backgroundColor: sc.bg, borderColor: sc.border }]}>
-              <View style={[styles.badgeDot, { backgroundColor: sc.pip }]} />
-              <Text style={[styles.badgeText, { color: sc.text }]}>{delivery.status}</Text>
-            </View>
-          </View>
-
-          <View style={styles.divider} />
-
-          <View style={styles.chipRow}>
-            <View style={[styles.infoChip, { backgroundColor: colors.primaryLight, borderColor: 'rgba(59, 130, 246, 0.2)' }]}>
-              <Text style={[styles.infoChipText, { color: colors.primaryDark }]}>🏷️ Express Priority</Text>
-            </View>
-            <View style={styles.infoChip}>
-              <Text style={styles.infoChipText}>🆔 {delivery.id}</Text>
-            </View>
-          </View>
-        </SectionCard>
-
-        {/* ── Progress timeline ── */}
-        <SectionCard>
-          <SectionLabel>SHIPMENT PROGRESS</SectionLabel>
-          <StepTimeline status={delivery.status} />
-        </SectionCard>
-
-        {/* ── Route: pickup -> drop-off ── */}
-        <SectionCard>
-          <SectionLabel>ROUTE</SectionLabel>
-
-          <View style={styles.routeRow}>
-            <View style={styles.routeMarkerCol}>
-              <View style={[styles.routeDot, { backgroundColor: colors.primary }]} />
-              <View style={styles.routeLine} />
-              <View style={[styles.routeDot, styles.routeDotEnd]} />
-            </View>
-            <View style={styles.routeTextCol}>
-              <View style={styles.routePoint}>
-                <Text style={styles.routePointLabel}>PICKUP</Text>
-                <Text style={styles.routePointValue}>PulseRoute Distribution Hub</Text>
+          {/* ── Hero: customer + tracking ── */}
+          <SectionCard style={styles.heroCard}>
+            <View style={styles.heroTop}>
+              <View style={styles.heroAvatar}>
+                <Text style={styles.heroAvatarText}>{delivery.customer.charAt(0)}</Text>
               </View>
-              <View style={styles.routePoint}>
-                <Text style={styles.routePointLabel}>DROP-OFF</Text>
-                <Text style={styles.routePointValue}>{delivery.address}</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.heroName}>{delivery.customer}</Text>
+                <Text style={styles.heroAddress} numberOfLines={2}>📍 {delivery.address}</Text>
+              </View>
+              
+              <View style={[styles.badge, { backgroundColor: sc.bg, borderColor: sc.border }]}>
+                <View style={[styles.badgeDot, { backgroundColor: sc.pip }]} />
+                <Text style={[styles.badgeText, { color: sc.text }]}>{delivery.status}</Text>
               </View>
             </View>
-          </View>
-        </SectionCard>
 
-        {/* ── Map placeholder ── */}
-        <SectionCard style={styles.mapCard}>
-          <View style={styles.mapSurface}>
-            <View style={styles.mapDashedLine} />
-            <View style={[styles.mapPin, styles.mapPinStart]}>
-              <Text style={styles.mapPinText}>●</Text>
+            <View style={styles.divider} />
+
+            <View style={styles.chipRow}>
+              <View style={[styles.infoChip, { backgroundColor: colors.primaryLight, borderColor: 'rgba(59, 130, 246, 0.2)' }]}>
+                <Text style={[styles.infoChipText, { color: colors.primaryDark }]}>🏷️ Express Priority</Text>
+              </View>
+              <View style={styles.infoChip}>
+                <Text style={styles.infoChipText}>🆔 {delivery.id}</Text>
+              </View>
             </View>
-            <View style={[styles.mapPin, styles.mapPinEnd]}>
-              <Text style={styles.mapPinText}>📍</Text>
+          </SectionCard>
+
+          {/* ── Progress timeline ── */}
+          <SectionCard>
+            <SectionLabel>SHIPMENT PROGRESS</SectionLabel>
+            <StepTimeline status={delivery.status} />
+          </SectionCard>
+
+          {/* ── Route: pickup -> drop-off ── */}
+          <SectionCard>
+            <SectionLabel>ROUTE</SectionLabel>
+
+            <View style={styles.routeRow}>
+              <View style={styles.routeMarkerCol}>
+                <View style={[styles.routeDot, { backgroundColor: colors.primary }]} />
+                <View style={styles.routeLine} />
+                <View style={[styles.routeDot, styles.routeDotEnd]} />
+              </View>
+              <View style={styles.routeTextCol}>
+                <View style={styles.routePoint}>
+                  <Text style={styles.routePointLabel}>PICKUP</Text>
+                  <Text style={styles.routePointValue}>PulseRoute Distribution Hub</Text>
+                </View>
+                <View style={styles.routePoint}>
+                  <Text style={styles.routePointLabel}>DROP-OFF</Text>
+                  <Text style={styles.routePointValue}>{delivery.address}</Text>
+                </View>
+              </View>
             </View>
-            <View style={styles.mapBadge}>
-              <View style={styles.mapBadgeDot} />
-              <Text style={styles.mapBadgeText}>Live tracking</Text>
+          </SectionCard>
+
+          {/* ── Map placeholder ── */}
+          <SectionCard style={styles.mapCard}>
+            <View style={styles.mapSurface}>
+              <View style={styles.mapDashedLine} />
+              <View style={[styles.mapPin, styles.mapPinStart]}>
+                <Text style={styles.mapPinText}>●</Text>
+              </View>
+              <View style={[styles.mapPin, styles.mapPinEnd]}>
+                <Text style={styles.mapPinText}>📍</Text>
+              </View>
+              <View style={styles.mapBadge}>
+                <View style={styles.mapBadgeDot} />
+                <Text style={styles.mapBadgeText}>Live tracking</Text>
+              </View>
             </View>
-          </View>
-          <TouchableOpacity style={styles.mapButton}>
-            <Text style={styles.mapButtonText}>Open Full Navigation</Text>
-          </TouchableOpacity>
-        </SectionCard>
+            <TouchableOpacity style={styles.mapButton}>
+              <Text style={styles.mapButtonText}>Open Full Navigation</Text>
+            </TouchableOpacity>
+          </SectionCard>
 
-        {/* ── Instructions ── */}
-        <SectionCard>
-          <SectionLabel>DROP-OFF INSTRUCTIONS</SectionLabel>
-          <View style={styles.noteRow}>
-            <Text style={styles.noteIcon}>🛎️</Text>
-            <Text style={styles.noteText}>Leave the package with the security desk if the customer is unavailable.</Text>
-          </View>
-          <View style={styles.noteRow}>
-            <Text style={styles.noteIcon}>☎️</Text>
-            <Text style={styles.noteText}>Contact the customer before marking the delivery as failed.</Text>
-          </View>
-        </SectionCard>
+          {/* ── Instructions ── */}
+          <SectionCard>
+            <SectionLabel>DROP-OFF INSTRUCTIONS</SectionLabel>
+            <View style={styles.noteRow}>
+              <Text style={styles.noteIcon}>🛎️</Text>
+              <Text style={styles.noteText}>Leave the package with the security desk if the customer is unavailable.</Text>
+            </View>
+            <View style={styles.noteRow}>
+              <Text style={styles.noteIcon}>☎️</Text>
+              <Text style={styles.noteText}>Contact the customer before marking the delivery as failed.</Text>
+            </View>
+          </SectionCard>
 
-        {/* ── Telemetry ── */}
-        <SectionCard>
-          <SectionLabel>RECENT TELEMETRY</SectionLabel>
-          <View style={styles.statGrid}>
-            <StatChip icon="🚗" value="28 km/h" label="SPEED" />
-            <StatChip icon="🔋" value="90%" label="BATTERY" />
-            <StatChip icon="📶" value="42 ms" label="LATENCY" />
-            <StatChip icon="🛰️" value="Active" label="GPS" />
-          </View>
-        </SectionCard>
-      </ScrollView>
+          {/* ── Telemetry ── */}
+          <SectionCard>
+            <SectionLabel>RECENT TELEMETRY</SectionLabel>
+            <View style={styles.statGrid}>
+              <StatChip icon="🚗" value="28 km/h" label="SPEED" />
+              <StatChip icon="🔋" value="90%" label="BATTERY" />
+              <StatChip icon="📶" value="42 ms" label="LATENCY" />
+              <StatChip icon="🛰️" value="Active" label="GPS" />
+            </View>
+          </SectionCard>
+        </ScrollView>
 
-      {/* ── Bottom action bar ── */}
-      {canAct ? (
-        <View style={styles.actionBar}>
-          <TouchableOpacity style={styles.callButton} accessibilityLabel="Call customer">
-            <Text style={styles.callButtonText}>📞</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.failButton}>
-            <Text style={styles.failButtonText}>Report Failed</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.deliveredButton}>
-            <Text style={styles.deliveredButtonText}>Mark Delivered</Text>
-          </TouchableOpacity>
-        </View>
-      ) : (
-        <View style={[styles.actionBar, styles.statusBar]}>
-          <View style={[styles.badgeDot, { backgroundColor: sc.pip }]} />
-          <Text style={[styles.statusBarText, { color: sc.text }]}>
-            {delivery.status === 'Delivered' ? 'This delivery is complete' : `Delivery marked as ${delivery.status.toLowerCase()}`}
-          </Text>
-        </View>
-      )}
-    </SafeAreaView>
+        {/* ── Bottom action bar ── */}
+        {canAct ? (
+          <View style={styles.actionBar}>
+            <TouchableOpacity style={styles.callButton} accessibilityLabel="Call customer">
+              <Text style={styles.callButtonText}>📞</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.failButton}>
+              <Text style={styles.failButtonText}>Report Failed</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.deliveredButton}>
+              <Text style={styles.deliveredButtonText}>Mark Delivered</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <View style={[styles.actionBar, styles.statusBar]}>
+            <View style={[styles.badgeDot, { backgroundColor: sc.pip }]} />
+            <Text style={[styles.statusBarText, { color: sc.text }]}>
+              {delivery.status === 'Delivered' ? 'This delivery is complete' : `Delivery marked as ${delivery.status.toLowerCase()}`}
+            </Text>
+          </View>
+        )}
+      </SafeAreaView>
+    </View>
   );
 }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: colors.bg },
+  container: { flex: 1 },
+  safeArea: { flex: 1, backgroundColor: 'transparent' },
   scroll: { flex: 1 },
-  scrollContent: { padding: 16, paddingBottom: 32, gap: 16 },
+  scrollContent: { paddingHorizontal: 16, paddingBottom: 32, paddingTop: 8, gap: 16 },
 
   // Top Navigation Bar
   topBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
     paddingHorizontal: 16,
-    paddingTop: Platform.OS === 'ios' ? 8 : 16,
-    paddingBottom: 8,
-    backgroundColor: colors.bg,
+    paddingTop: Platform.OS === 'ios' ? 8 : 48, // Added padding for translucent status bar
+    paddingBottom: 16,
+    backgroundColor: 'transparent',
   },
   iconButton: {
     width: 44,
@@ -319,6 +398,41 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   iconButtonText: { fontSize: 20, color: colors.textPrimary },
+
+  // Screen Heading & 3D Element
+  headerHero: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerTitle: {
+    fontSize: 24, // Slightly reduced to fit comfortably on one line
+    fontWeight: '800',
+    color: colors.textPrimary,
+    letterSpacing: -0.8,
+  },
+  floatingContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 44,
+    height: 44,
+    marginLeft: 6,
+    marginTop: -4,
+  },
+  graphicEmoji: {
+    fontSize: 28, // Scaled down slightly to match the new headerTitle size
+    zIndex: 2,
+    lineHeight: 36,
+  },
+  graphicShadow: {
+    position: 'absolute',
+    bottom: 4,
+    width: 18,
+    height: 4,
+    backgroundColor: 'rgba(0,0,0,1)',
+    borderRadius: 10,
+    zIndex: 1,
+  },
 
   badge: { 
     flexDirection: 'row', 
