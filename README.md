@@ -1,174 +1,112 @@
 # PulseRoute 🚚
 
-Offline-First Last-Mile Delivery Application built with React Native and Expo.
+An offline-first last-mile delivery application built with React Native and Expo.
 
 ## Overview
 
-PulseRoute is a cross-platform delivery management application designed for last-mile delivery couriers operating in environments with intermittent or unreliable network connectivity. The application follows an offline-first architecture, ensuring that delivery operations remain functional even when internet access is unavailable.
-
-The system allows couriers to manage deliveries, update delivery statuses, generate and visualize telemetry data, queue offline actions, and automatically synchronize pending operations once connectivity is restored.
+PulseRoute is designed for delivery couriers operating in environments with unreliable network connectivity. The application allows delivery updates to be recorded locally, queued during offline periods, and automatically synchronized when connectivity is restored.
 
 ---
 
-# Features
+## Features
 
-## Delivery Dashboard
+### Delivery Dashboard
 
-* View assigned deliveries in a high-performance scrollable list
-* Display delivery metadata including:
+* View assigned deliveries
+* Track delivery status
+* Priority indicators
+* Offline/Online network simulation
+* Swipe gestures for delivery actions
 
-  * Tracking ID
-  * Customer Name
-  * Delivery Address
-  * Priority Level
-  * Delivery Status
-* Real-time delivery statistics
-* Network connectivity simulation toggle
+### Offline-First Synchronization
 
-## Offline-First Workflow
-
-* Manual Online/Offline network simulation
 * Local persistence of delivery data
-* Offline action queue
-* Automatic synchronization when connectivity is restored
-* Pending Sync state visualization
+* Offline mutation queue
+* Pending Sync status tracking
+* Automatic synchronization upon reconnecting
 
-## Delivery Detail View
+### Delivery Detail Screen
 
-* Tracking information
-* Delivery address
-* Status information
+* Delivery information
 * Drop-off instructions
-* Navigation map placeholder
-* Recent telemetry visualization
+* Telemetry monitoring
+* Navigation placeholder
 
-## Gesture-Based Actions
+### Telemetry Simulation
 
-* Swipe Right → Mark Delivered
-* Swipe Left → Mark Failed
-
-## Telemetry Simulation Engine
-
-Simulated telemetry events generated every 500ms:
-
-* Tracking ID
-* Timestamp
-* Latitude
-* Longitude
-* Vehicle Speed
-* Battery Level
-* Network Latency
-
-Telemetry data is displayed in a live activity feed to simulate active vehicle monitoring.
+* Generates tracking events every 500ms
+* Simulates GPS coordinates
+* Simulates device metrics
+* Live telemetry feed
 
 ---
 
-# Tech Stack
+## Screenshots
 
-## Frontend
+### Dashboard
 
-* React Native
-* Expo SDK 54
-* TypeScript
+![Dashboard](screenshots/dashboard.png)
 
-## Navigation
+### Offline Queue
 
-* React Navigation
-* Native Stack Navigator
+![Offline Queue](screenshots/offline-queue.png)
 
-## Storage
+### Delivery Detail View
 
-* AsyncStorage
-
-## Gestures
-
-* React Native Gesture Handler
+![Delivery Detail](screenshots/detail-screen.png)
 
 ---
 
-# Installation & Setup
+## Technology Stack
 
-## Prerequisites
-
-Install the following:
-
-* Node.js (18+ recommended)
-* npm
-* Expo Go (Android/iOS)
+| Category    | Technology                   |
+| ----------- | ---------------------------- |
+| Framework   | React Native                 |
+| Platform    | Expo SDK 54                  |
+| Language    | TypeScript                   |
+| Navigation  | React Navigation             |
+| Persistence | AsyncStorage                 |
+| Gestures    | React Native Gesture Handler |
 
 ---
 
-## Clone Repository
+## Installation
+
+### Clone Repository
 
 ```bash
 git clone <repository-url>
 cd PulseRoute
 ```
 
-## Install Dependencies
+### Install Dependencies
 
 ```bash
 npm install
 ```
 
-## Start Development Server
+### Run Development Server
 
 ```bash
 npx expo start
 ```
 
----
+### Android Device
 
-# Running on Android Device
+1. Install Expo Go.
+2. Connect device to the same network.
+3. Scan the generated QR code.
 
-1. Install Expo Go from Google Play Store.
-2. Connect the mobile device and development machine to the same network.
-3. Start the Expo development server:
-
-```bash
-npx expo start
-```
-
-4. Scan the QR code using Expo Go.
-5. The application will launch on the device.
-
----
-
-# Running on Android Emulator
+### Android Emulator
 
 ```bash
 npm run android
 ```
 
-Android Studio Emulator must be installed and running.
-
----
-
-# Running on iOS Simulator
+### iOS Simulator
 
 ```bash
 npm run ios
-```
-
-Requires macOS with Xcode installed.
-
----
-
-# Project Structure
-
-```text
-PulseRoute
-│
-├── screens/
-│   ├── DashboardScreen.tsx
-│   └── DetailScreen.tsx
-│
-├── storage/
-│   ├── storage.ts
-│
-├── App.tsx
-├── package.json
-└── README.md
 ```
 
 ---
@@ -177,190 +115,107 @@ PulseRoute
 
 ## 1. Offline-First Architecture
 
-### Problem
+The primary requirement of this assessment was maintaining functionality during connectivity loss.
 
-Delivery personnel frequently operate in areas with poor or unavailable connectivity, making immediate server communication unreliable.
+To achieve this, all delivery updates are applied locally before any synchronization attempt occurs. When the application is offline, actions are stored in a local synchronization queue and marked as "Pending Sync".
 
-### Solution
+Once connectivity is restored, queued operations are processed automatically and statuses are updated accordingly.
 
-PulseRoute follows a local-first architecture.
-
-All user actions are immediately committed locally before any server synchronization is attempted.
-
-This guarantees:
-
-* Instant UI responsiveness
-* No data loss during connectivity interruptions
-* Consistent user experience regardless of network availability
+This approach ensures reliability and prevents data loss during network interruptions.
 
 ---
 
-## 2. Local Storage Engine Selection
+## 2. Local Storage Strategy
 
-### Selected Solution
+### Selected Technology
 
 AsyncStorage
 
 ### Reasoning
 
-The assessment required a local persistence layer capable of storing delivery state and synchronization queues.
+AsyncStorage was selected to provide persistent local storage for:
 
-AsyncStorage was selected because:
+* Delivery data
+* Synchronization queue
+* Network mode state
 
-* Lightweight integration with Expo Go
-* Persistent storage across application restarts
-* Simple implementation for rapid prototyping
-* Suitable for the assessment-scale dataset
-
-### Future Improvements
-
-For larger production workloads, AsyncStorage could be replaced by:
-
-* MMKV
-* SQLite
-* WatermelonDB
-
-without significant changes to the application architecture.
+This allows the application to recover its state after restarts and maintain offline operations without requiring server connectivity.
 
 ---
 
 ## 3. State Management Architecture
 
-### Selected Solution
+### Selected Approach
 
 React Hooks
 
+The application uses:
+
 * useState
 * useEffect
+* useCallback
 
-### Reasoning
-
-The application contains a relatively small and well-defined state surface:
-
-* Delivery list
-* Sync queue
-* Connectivity status
-* Telemetry feed
-
-React Hooks provided sufficient state management capabilities while minimizing architectural complexity.
-
-This approach reduces:
-
-* Boilerplate code
-* Learning overhead
-* Unnecessary global state
+The state surface of the application is relatively small and localized, making React Hooks a lightweight and maintainable solution without introducing additional state management libraries.
 
 ---
 
-## 4. Synchronization Queue Design
+## 4. Synchronization Engine
 
-When the application is Offline:
+When operating offline:
 
-1. User actions are applied immediately.
-2. Changes are persisted locally.
-3. Mutations are added to a synchronization queue.
-4. UI displays a Pending Sync status.
+1. Delivery actions are recorded locally.
+2. Items are marked as Pending Sync.
+3. Mutations are stored in a synchronization queue.
 
 When connectivity returns:
 
-1. Queue processing begins automatically.
-2. Pending mutations are synchronized.
-3. Status indicators are updated.
-4. Queue entries are removed.
+1. The queue is processed sequentially.
+2. Pending operations are applied.
+3. Synchronization indicators are removed.
+4. Local state is updated.
 
-This simulates a real-world offline synchronization workflow used by delivery and field-service applications.
-
----
-
-## 5. Telemetry Simulation Engine
-
-The assessment required continuous telemetry generation.
-
-A background interval generates telemetry events every 500ms.
-
-Each event contains:
-
-```json
-{
-  "tracking_id": "PR-1004",
-  "timestamp": 1781647412,
-  "telemetry": {
-    "latitude": 8.5253,
-    "longitude": 76.9367,
-    "speed_kmh": 28
-  },
-  "device_metrics": {
-    "battery_level": 88,
-    "network_latency_ms": 44
-  }
-}
-```
-
-Generated events are visualized through a live telemetry feed.
+This simulates a production-style offline synchronization workflow commonly used in logistics applications.
 
 ---
 
-## 6. Performance Optimization Strategy
+## 5. Performance Optimization
+
+Several measures were implemented to maintain responsiveness:
 
 ### FlatList Virtualization
 
-FlatList was selected to ensure efficient rendering of delivery records while minimizing unnecessary re-renders.
+FlatList was used for efficient rendering of delivery records and to avoid unnecessary memory usage.
+
+### Memoized Components
+
+React.memo was used to prevent unnecessary re-renders of delivery cards.
+
+### Stable Callbacks
+
+useCallback was used to avoid recreating frequently passed functions during re-renders.
 
 ### Controlled Telemetry History
 
-Only a limited number of telemetry events are retained and displayed.
-
-Benefits:
-
-* Reduced memory usage
-* Stable rendering performance
-* Predictable UI responsiveness
-
-### Interval Cleanup
-
-Telemetry intervals are properly disposed during component unmounting.
-
-This prevents:
-
-* Memory leaks
-* Duplicate generators
-* Background execution overhead
+Telemetry history is capped to a fixed-size buffer, preventing unbounded memory growth.
 
 ---
 
-## 7. UI Thread Optimization
+## 6. UI Thread Optimization During Telemetry Ingestion
 
-The telemetry engine continuously generates events every 500ms.
+The telemetry generator continuously produces tracking events at fixed intervals.
 
-To maintain smooth UI interactions:
+To ensure the UI remains responsive:
 
-* Lightweight payload generation is used
-* Telemetry history size is constrained
-* FlatList virtualization minimizes rendering cost
-* State updates are isolated to affected components
+* Telemetry payloads remain lightweight
+* Telemetry history is capped
+* Interval cleanup prevents memory leaks
+* FlatList virtualization reduces rendering overhead
+* State updates are limited to affected components
 
-This ensures the interface remains responsive during continuous telemetry ingestion.
-
----
-
-# Known Limitations
-
-* Navigation map is represented using a placeholder component.
-* Synchronization targets a simulated backend rather than a live server.
-* Telemetry data is simulated and does not represent real GPS hardware.
+These measures help maintain smooth user interactions while telemetry events are continuously generated.
 
 ---
 
-# Future Enhancements
+## Author
 
-* Real backend integration
-* Background location tracking
-* Push notifications
-* MMKV or SQLite migration
-* Real-time maps integration
-* Authentication and courier profiles
-
----
-
-
-
+Developed by Uttara Praveen.
