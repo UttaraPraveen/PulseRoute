@@ -25,8 +25,6 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
-const AnimatedFeather = Animated.createAnimatedComponent(Feather);
-
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type DeliveryStatus = 'Pending' | 'In Transit' | 'Delivered' | 'Pending Sync' | 'Failed';
@@ -368,7 +366,7 @@ const DeliveryCard = memo(function DeliveryCard({
   const triggerDeliveredAnim = useCallback((callback: () => void) => {
     swipeableRef.current?.close();
     Animated.sequence([
-      Animated.spring(actionScale, { toValue: 1.05, speed: 40, bounciness: 12, useNativeDriver: true }), // Quick celebratory pop
+      Animated.spring(actionScale, { toValue: 1.05, speed: 40, bounciness: 12, useNativeDriver: true }), 
       Animated.spring(actionScale, { toValue: 1, speed: 40, bounciness: 8, useNativeDriver: true }),
     ]).start();
     setTimeout(callback, 150);
@@ -526,46 +524,55 @@ export default function DashboardScreen({ navigation }: any) {
     navigation.setOptions({ headerShown: false });
   }, [navigation]);
 
-  const [isOnline, setIsOnline] = useState(true);
+  const [isOnline, setIsOnline] = useState<boolean | null>(null);
   const [filter, setFilter] = useState<FilterOption>('All');
   const [telemetryLogs, setTelemetryLogs] = useState<TelemetryEvent[]>([]);
   const [isSyncing, setIsSyncing] = useState(false);
 
   const [isStorageLoaded, setIsStorageLoaded] = useState(false);
   const [deliveries, setDeliveries] = useState<Delivery[]>(DEFAULT_DELIVERIES);
-  // Type updated to handle both legacy strings and new object payloads
-  const [syncQueue, setSyncQueue] = useState<(QueuedSync | string)[]>([]);
+  
+  const [syncQueue, setSyncQueue] = useState<QueuedSync[]>([]);
 
   const syncSpinAnim = useRef(new Animated.Value(0)).current;
-
-  // Background Transition Animation Value
   const bgAnim = useRef(new Animated.Value(1)).current;
 
   const animateListChange = () => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
   };
 
-  // Crossfade background smoothly when toggling isOnline
   useEffect(() => {
+    if (isOnline === null) return;
     Animated.timing(bgAnim, {
       toValue: isOnline ? 1 : 0,
-      duration: 600, // Very smooth crossfade duration
+      duration: 600,
       easing: Easing.inOut(Easing.cubic),
       useNativeDriver: true,
     }).start();
   }, [isOnline, bgAnim]);
 
+  // LOAD DATA ON BOOT
   useEffect(() => {
     const loadInitialData = async () => {
       const savedDeliveries = await loadData('deliveries');
       if (savedDeliveries) setDeliveries(savedDeliveries);
+      
       const savedQueue = await loadData('syncQueue');
       if (savedQueue) setSyncQueue(savedQueue);
+      
+      const savedIsOnline = await loadData('isOnline');
+      if (savedIsOnline !== null && savedIsOnline !== undefined) {
+        setIsOnline(savedIsOnline);
+      } else {
+        setIsOnline(true);
+      }
+      
       setIsStorageLoaded(true);
     };
     loadInitialData();
   }, []);
 
+  // SAVE DATA HOOKS
   useEffect(() => {
     if (isStorageLoaded) saveData('deliveries', deliveries);
   }, [deliveries, isStorageLoaded]);
@@ -574,7 +581,11 @@ export default function DashboardScreen({ navigation }: any) {
     if (isStorageLoaded) saveData('syncQueue', syncQueue);
   }, [syncQueue, isStorageLoaded]);
 
-  // Synchronize Offline actions gracefully when reconnecting
+  useEffect(() => {
+    if (isStorageLoaded && isOnline !== null) saveData('isOnline', isOnline);
+  }, [isOnline, isStorageLoaded]);
+
+  // OFFLINE SYNC PROCESSING
   useEffect(() => {
     if (isOnline && syncQueue.length > 0) {
       setIsSyncing(true);
@@ -584,15 +595,10 @@ export default function DashboardScreen({ navigation }: any) {
         
         setDeliveries((prev) =>
           prev.map((d) => {
-            // Find if this item exists in the queue (handling both legacy strings and objects)
-            const queuedItem = syncQueue.find((q) => 
-              typeof q === 'string' ? q === d.id : q.id === d.id
-            );
+            const queuedItem = syncQueue.find((q) => q.id === d.id);
             
             if (queuedItem && d.status === 'Pending Sync') {
-              // Apply the targeted offline action or fallback to Delivered
-              const target = typeof queuedItem === 'string' ? 'Delivered' : queuedItem.targetStatus;
-              return { ...d, status: target };
+              return { ...d, status: queuedItem.targetStatus };
             }
             return d;
           })
@@ -602,7 +608,6 @@ export default function DashboardScreen({ navigation }: any) {
         setIsSyncing(false);
       }, 2000);
       
-      // Cleanup to resolve the memory leak / stuck state
       return () => {
         clearTimeout(timeout);
         setIsSyncing(false); 
@@ -647,7 +652,7 @@ export default function DashboardScreen({ navigation }: any) {
         },
       };
       setTelemetryLogs((prev) => [event, ...prev.slice(0, 9)]);
-    }, 1000);
+    }, 500); 
     return () => clearInterval(interval);
   }, []);
 
@@ -692,6 +697,10 @@ export default function DashboardScreen({ navigation }: any) {
     return true;
   });
 
+  if (isOnline === null || !isStorageLoaded) {
+    return null;
+  }
+
   return (
     <View style={styles.container}>
       {/* Base Offline Gradient Layer (Cool Slate/Gray) */}
@@ -726,28 +735,6 @@ export default function DashboardScreen({ navigation }: any) {
             </View>
           </View>
 
-          {isSyncing && (
-            <View style={[styles.syncBanner, styles.syncBannerSyncing]}>
-              <AnimatedFeather
-                name="refresh-cw"
-                size={14}
-                color={colors.primary}
-                style={{ transform: [{ rotate: spin }] }}
-              />
-              <Text style={[styles.syncBannerText, { color: colors.primary }]}>
-                 Syncing {syncQueue.length} update{syncQueue.length > 1 ? 's' : ''}...
-              </Text>
-            </View>
-          )}
-          {!isOnline && syncQueue.length > 0 && !isSyncing && (
-            <View style={styles.syncBanner}>
-              <Feather name="wifi-off" size={14} color={colors.pending.text} />
-              <Text style={styles.syncBannerText}>
-                 {syncQueue.length} queued — waiting for connection
-              </Text>
-            </View>
-          )}
-
           {/* Filter Pills and Online Toggle Row */}
           <View style={styles.filterToggleRow}>
             <View style={styles.pillRow}>
@@ -762,6 +749,32 @@ export default function DashboardScreen({ navigation }: any) {
               ))}
             </View>
             <OnlineToggle value={isOnline} onToggle={() => setIsOnline((v) => !v)} />
+          </View>
+
+          {/* Sync Banners - Moved Below Filters into a stable container */}
+          <View style={styles.bannerContainer}>
+            {isSyncing && (
+              <View style={[styles.syncBanner, styles.syncBannerSyncing]}>
+                <Animated.View style={{ transform: [{ rotate: spin }] }}>
+                  <Feather
+                    name="refresh-cw"
+                    size={14}
+                    color={colors.primary}
+                  />
+                </Animated.View>
+                <Text style={[styles.syncBannerText, { color: colors.primary }]}>
+                   Syncing {syncQueue.length} update{syncQueue.length > 1 ? 's' : ''}...
+                </Text>
+              </View>
+            )}
+            {!isOnline && syncQueue.length > 0 && !isSyncing && (
+              <View style={styles.syncBanner}>
+                <Feather name="cloud-off" size={14} color={colors.pending.text} />
+                <Text style={styles.syncBannerText}>
+                   Sync pending: {syncQueue.length} offline update{syncQueue.length > 1 ? 's' : ''}
+                </Text>
+              </View>
+            )}
           </View>
 
         </View>
@@ -823,7 +836,7 @@ const styles = StyleSheet.create({
 
   header: {
     paddingHorizontal: 24,
-    paddingTop: Platform.OS === 'ios' ? 12 : 48, // slightly padded for the translucent status bar
+    paddingTop: Platform.OS === 'ios' ? 12 : 48, 
     paddingBottom: 20, 
     backgroundColor: 'transparent',
   },
@@ -837,7 +850,6 @@ const styles = StyleSheet.create({
     alignItems: 'center', 
   },
   
-  // Controls Row containing both Filters and Toggle
   filterToggleRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -848,7 +860,6 @@ const styles = StyleSheet.create({
     gap: 8, 
   },
 
-  // Floating Package Adjustments
   floatingContainer: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -894,7 +905,19 @@ const styles = StyleSheet.create({
   toggleTrack: { width: 44, height: 26, borderRadius: 9999, justifyContent: 'center' },
   toggleThumb: { width: 20, height: 20, borderRadius: 9999, backgroundColor: colors.surface, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 3, elevation: 3 },
 
-  syncBanner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.pending.bg, paddingVertical: 12, borderRadius: 12, marginBottom: 20 },
+  bannerContainer: {
+    minHeight: 0, // Keeps structural stability for LayoutAnimation
+  },
+  syncBanner: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    justifyContent: 'center', 
+    gap: 8, 
+    backgroundColor: colors.pending.bg, 
+    paddingVertical: 12, 
+    borderRadius: 12, 
+    marginTop: 20, 
+  },
   syncBannerSyncing: { backgroundColor: colors.primaryLight },
   syncBannerText: { fontSize: 13, color: colors.pending.text, fontWeight: '600' },
 
