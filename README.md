@@ -43,8 +43,6 @@ PulseRoute is designed for delivery couriers operating in environments with unre
 
 ## Screenshots
 
-## Screenshots
-
 <p align="center">
   <img src="PulseRoute/screenshots/dashboard.png" width="250"/>
   <img src="PulseRoute/screenshots/offline-mode.png" width="250"/>
